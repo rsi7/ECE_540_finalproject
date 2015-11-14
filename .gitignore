@@ -1,0 +1,36 @@
+# .gitignore file for ECE 540 Project #2
+
+$ cat .gitignore
+
+# exclude everything in vivado directory
+# because it generates too many file changes
+# which obscure revisions to the HDL code
+
+/vivado/*
+
+# ignore everything in docs
+# these are just PDFs and Word files
+# available on D2L course website
+
+/docs/*
+
+# exclude all files in firmware
+# except verilog & assembly code
+
+firmware/*
+!/firmware/*.v
+!/firmware/*.psm
+
+# exclude all files in hdl_part1
+# except for verilog & assembly code
+# (uncomment to enable)
+
+# hdl_part1/*
+# !/hdl_part1/*.v
+# !/hdl_part1/*.psm
+
+# also exclude source & testbench folders
+# (uncomment to enable)
+
+# !/hdl_part1/source/
+# !/hdl_part1/testbench/
