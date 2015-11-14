@@ -12,7 +12,7 @@ $ cat .gitignore
 # these are just PDFs and Word files
 # available on D2L course website
 
-/docs/*
+#/docs/*
 
 # exclude all files in firmware
 # except verilog & assembly code
