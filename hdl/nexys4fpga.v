@@ -2,15 +2,15 @@
 //
 // Description:
 // ------------
-// Top level module for the ECE 540 Project 2 Video Demo
+// Top level module for the ECE 540 Final Project
 // on the Nexys4 DDR Board (Xilinx XC7A100T-CSG324)
 //
-//  Use the pushbuttons to control the BotSim wheels:
+//  Use the pushbuttons to control the menu:
 //
-//	btnl			Left wheel forward
-//	btnu			Left wheel reverse
-//	btnr			Right wheel forward
-//	btnd			Right wheel reverse
+//	btnl			(function)
+//	btnu			(function)
+//	btnr			(function)
+//	btnd			(function)
 //  btnc			Not used in this design
 //	btnCpuReset		CPU RESET Button - system reset.  Asserted low by Nexys 4 board
 //
@@ -178,19 +178,8 @@ module nexys4fpga (
 	/* BotInterface instantiation		                              */
 	/******************************************************************/
 
-	nexys_bot_if BotInterface (
+	picoblaze_if Picoblaze_if (
 
-		// connections with BotSim
-
-		.MotCtl 		(MotCtl),				// O [7:0] Motor control of BotSim
-		.LocX 			(LocX),					// I [7:0] X-coordinate of BotSim's location
-		.LocY 			(LocY),					// I [7:0] Y-coordinate of BotSim's location
-		.Sensors 		(Sensors), 				// I [7:0] Sensor readings from BotSim
-		.botInfo 		(botInfo), 				// I [7:0] Information about BotSim's activity
-		.lmdist 		(lmdist), 				// I [7:0] Left motor distance register
-		.rmdist 		(rmdist), 				// I [7:0] Right motor distance register
-		.upd_sysregs 	(upd_sysregs),			// I [ 0 ] update system register
-	
 		// connections with KCPSM6
 
 		.port_id 			(port_id),				// I [7:0] address of port id

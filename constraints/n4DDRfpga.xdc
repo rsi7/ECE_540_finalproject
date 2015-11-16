@@ -1,6 +1,5 @@
 ## This is a sample contstraints file for the Nexys4 DDR with pins mapped according
-## to the top level n4fpga.v provided with the Getting Started project
-## Modified by Roy Kravitz 06-Jan-2015
+## to the top level nexys4fpga.v
 ##
 ## This file is a general .xdc for the Nexys4 DDR Rev. C
 ## To use it in a project:
