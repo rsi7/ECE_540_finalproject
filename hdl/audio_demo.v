@@ -86,7 +86,7 @@ always @(posedge clock) begin
 		
 		end
 		
-		else if (pdm_reg_clk == clock_devider)begin
+		else if (pdm_reg_clk == clock_devider && clock_pdm == zero)begin
 				
 				pdm_out			<=	mic_in_pdm;
 				
