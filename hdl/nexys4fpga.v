@@ -58,9 +58,7 @@ module nexys4fpga (
 	// PWM interface with Audio Out
 
 	output 				pdm_data_o,
-	output 				pdm_en_o
-
-);
+	output 				pdm_en_o);
 
 	/******************************************************************/
 	/* Local parameters and variables				                  */
@@ -104,8 +102,8 @@ module nexys4fpga (
 	// Connections between VgaCtrl <--> ImgCtrl
 
 	wire 				flgActiveVideo;
-	wire 	[31:0]		adrHor;
-	wire	[31:0]		adrVer;
+	wire 	[9:0]		adrHor;
+	wire	[9:0]		adrVer;
 
 	// Connections for 10Hz flag generator block
 
@@ -202,7 +200,7 @@ module nexys4fpga (
 	audio_demo AudioGen (
 
 		.clk_i 					(clk),						// I [ 0 ]
-		.rst_i					(sysreset),					// I [ 0 ]  active-high reset for audio_demo
+		.rst_i					(1'b0),						// I [ 0 ]  active-high reset for audio_demo
 
 		// PDM interface with the MIC
 
@@ -227,6 +225,7 @@ module nexys4fpga (
 	FftBlock FFT (
 
 		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the state machine
+		.btnL 					(db_btns[4]),
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
 		.ckaTime 				(clk),						// I [ 0 ]
 		.enaTime 				(flgTimeFrameActive),		// O [ 0 ]
@@ -257,7 +256,7 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.ck100MHz 					(clk), 					// I [ 0 ]
+		.ck100MHz 				(clk), 					// I [ 0 ]
 
 		// Time-domain signals
 
