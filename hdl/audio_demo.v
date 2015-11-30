@@ -81,7 +81,7 @@ always @(posedge clock) begin
 		if (reset) begin
 		
 					
-				pdm_out			<=	mic_in_pdm;
+				pdm_out			<=	zero;
 		
 		
 		end
