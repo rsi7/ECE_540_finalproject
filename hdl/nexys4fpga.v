@@ -47,7 +47,7 @@ module nexys4fpga (
 	output 				Vsync,					// vertical sync pulse
 	output 	[3:0]		vgaRed,					// red pixel data --> send to screen
 	output 	[3:0]		vgaGreen,				// green pixel data --> send to screen
-	output 	[3:0]		vgaBlue					// blue pixel data --> send to screen
+	output 	[3:0]		vgaBlue,				// blue pixel data --> send to screen
 
 	// Microphone signals
 
@@ -102,7 +102,7 @@ module nexys4fpga (
 	wire 				flgFreqSampleValid;			// flgFreqSampleValid (FFT_Block) --> wea (frequency buffer)
 	wire 	[9:0] 		addraFreq;					// frequency address counter (FFT_Block) --> addra (frequency buffer)
 
-	// Connections between VgaCtrl <--> Nexys4
+	// Connections between VgaCtrl <--> ImgCtrl
 
 	wire 				flgActiveVideo;
 	integer 			adrHor;
@@ -110,7 +110,7 @@ module nexys4fpga (
 
 	// Connections for 10Hz flag generator block
 
-	wire 				flgStartAcquisition;		// 10Hz flag
+	reg 				flgStartAcquisition;		// 10Hz flag
 	integer 			cntPresc;					// counter from 0 - 9999999
 
 
@@ -118,7 +118,7 @@ module nexys4fpga (
 	/* Global Assignments							                  */
 	/******************************************************************/			
 	
-	assign 	sysreset = ~db_btns[0]; 	// btnCpuReset is asserted low
+	assign 	sysreset = ~db_btns[0]; 	// btnCpuReset is asserted low --> sysreset is active-high
 
 	assign 	dp  = segs_int [7];			// sending decimal signals --> FPGA pins
 	assign 	seg = segs_int [6:0];		// sending digit signals --> FPGA pins
@@ -129,7 +129,7 @@ module nexys4fpga (
 
 	always@(posedge clk) begin
 		if (cntPresc == (cstDivPresc-1)) begin
-			cntPresc <= 0;
+			cntPresc <= 1'b0;
 			flgStartAcquisition <= 1'b1;
 		end
 		else begin
@@ -204,7 +204,7 @@ module nexys4fpga (
 	audio_demo AudioGen (
 
 		.clk_i 					(clk),						// I [ 0 ]
-		.rst_i					(1'b0),						// I [ 0 ]  keep 'low' -> never reset AudioGen block
+		.rst_i					(sysreset),					// I [ 0 ]  active-high reset for audio_demo
 
 		// PDM interface with the MIC
 
@@ -214,13 +214,13 @@ module nexys4fpga (
 
 		// Parallel data from MIC
 
-		.data_mic_valid 		(flgTimeSampleValid),		// O [ 0 ]  48MHz data enable
+		.data_mic_valid 		(flgTimeSampleValid),		// O [ 0 ]  output from audio_demo and FftBlock (48MHz data enable)
 		.data_mic 				(wordTimeSample),			// O [15:0] data from PDM decoder
 
 		// PWM interface with Audio Out
 
 		.pdm_data_o 			(pdm_data_o),				// O [ 0 ]
-		.pdm_en_o 				(pdm_en_oA));				// O [ 0 ]	   
+		.pdm_en_o 				(pdm_en_o));				// O [ 0 ]	   
 
 	/******************************************************************/
 	/* FFT instantiation                       					  	  */
@@ -229,12 +229,12 @@ module nexys4fpga (
 	FftBlock FFT (
 
 		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the state machine
-		.sw 					(sw),						// I [2:0] selecting output data byte (sensitivity)
+		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
 		.ckaTime 				(clk),						// I [ 0 ]
 		.enaTime 				(flgTimeFrameActive),		// O [ 0 ]
-		.weaTime 				(flgTimeSampleValid),		// O [ 0 ]
+		.weaTime 				(flgTimeSampleValid),		// O [ 0 ] output from audio_demo and FftBlock
 		.addraTime 				(addraTime),				// O [9:0]
-		.dinaTime 				(wordTimeSample),			// I [7:0]
+		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0]
 		.ckFreq 				(CLK_25MHZ),				// I [ 0 ]
 		.flgFreqSampleValid 	(flgFreqSampleValid),		// O [ 0 ]
 		.addrFreq 				(addraFreq),				// O [9:0]
@@ -247,8 +247,8 @@ module nexys4fpga (
 	VgaCtrl VGA_Controller (
 
 		.ckvideo 				(CLK_25MHZ),				// I [ 0 ]
-		.adrHor					(adrHor),					// O
-		.adrVer					(adrVer),					// O
+		.adrHor					(adrHor),					// O [31:0]
+		.adrVer					(adrVer),					// O [31:0]
 		.flgActiveVideo 		(flgActiveVideo),			// O [ 0 ]
 		.HS 					(Hsync),					// O [ 0 ]
 		.VS 					(Vsync));					// O [ 0 ]
@@ -259,18 +259,18 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.clk 					(clk), 							// I [ 0 ]
+		.clk 					(clk), 						// I [ 0 ]
 
 		// Time-domain signals
 
 		.enaTime 				(flgTimeFrameActive),		// I [ 0 ]
-		.weaTime 				(flgTimeSampleValid),		// I [ 0 ]
+		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] output from audio_demo and FftBlock
 		.addraTime 				(addraTime),				// I [9:0]
-		.dinaTime 				(wordTimeSample),			// I [7:0]
+		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0]
 
 		// Frequency-domain signals
 
-		.enaFreq 				(1'b1)						// I [ 0 ]
+// 		.enaFreq 				(1'b1)						// I [ 0 ]
 		.weaFreq				(flgFreqSampleValid),		// I [ 0 ]
 		.addraFreq 				(addraFreq),				// I [9:0]
 		.dinaFreq				(byteFreqSample),			// I [7:0]
@@ -279,8 +279,8 @@ module nexys4fpga (
 
 		.ckVideo				(CLK_25MHZ),				// I [ 0 ]
 		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ]
-		.adrHor					(adrHor),					// I
-		.adrVer					(adrVer),					// I
+		.adrHor					(adrHor),					// I [31:0]
+		.adrVer					(adrVer),					// I [31:0]
 		.red 					(vgaRed),					// O [3:0]
 		.green 					(vgaGreen),					// O [3:0]
 		.blue 					(vgaBlue));					// O [3:0]
