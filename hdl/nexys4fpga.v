@@ -67,6 +67,7 @@ module nexys4fpga (
 	/******************************************************************/
 
 	parameter 			SIMULATE = 0;
+	localparam 			cstDivPresc = 10000000;		// divide the 100MHz clock for 10Hz flags
 
 	wire				sysreset;					// system reset signal - asserted high to force reset
 
@@ -91,6 +92,27 @@ module nexys4fpga (
 	wire    [7:0]       segs_int;               	// segments and the decimal point
 	wire 	[63:0]		digits_out;					// ASCII digits (only for simulation)
 
+	// Connections
+
+	wire	[15:0]		wordTimeSample;				// data_mic (audio_demo) --> dina (Time buffer)
+	wire 				flgTimeSampleValid;			// data_mic_valid (audio_demo) --> wea (Time buffer)
+	wire 				flgTimeFrameActive;			// time address counter (FFT_Block) --> ena (Time buffer)
+	wire 	[9:0] 		addraTime;					// time address counter (FFT_Block) --> addra (Time buffer)
+	wire 	[7:0] 		byteFreqSample; 			// data_mic (FFT_Block) --> dina (Time buffer)
+	wire 				flgFreqSampleValid;			// flgFreqSampleValid (FFT_Block) --> wea (frequency buffer)
+	wire 	[9:0] 		addraFreq;					// frequency address counter (FFT_Block) --> addra (frequency buffer)
+
+	// Connections between VgaCtrl <--> Nexys4
+
+	wire 				flgActiveVideo;
+	integer 			adrHor;
+	integer				adrVer;
+
+	// Connections for 10Hz flag generator block
+
+	wire 				flgStartAcquisition;		// 10Hz flag
+	integer 			cntPresc;					// counter from 0 - 9999999
+
 
 	/******************************************************************/
 	/* Global Assignments							                  */
@@ -101,6 +123,20 @@ module nexys4fpga (
 	assign 	dp  = segs_int [7];			// sending decimal signals --> FPGA pins
 	assign 	seg = segs_int [6:0];		// sending digit signals --> FPGA pins
 
+	/******************************************************************/
+	/* 10Hz flag generator block					                  */
+	/******************************************************************/
+
+	always@(posedge clk) begin
+		if (cntPresc == (cstDivPresc-1)) begin
+			cntPresc <= 0;
+			flgStartAcquisition <= 1'b1;
+		end
+		else begin
+			cntPresc <= cntPresc + 1'b1;
+			flgStartAcquisition <= 1'b0;
+		end
+	end
 
 	/******************************************************************/
 	/* ClockWiz instantiation		           	                      */
