@@ -73,7 +73,6 @@ module nexys4fpga (
 
 	// Connections between Nexys4 <--> ClockWiz
 
-	wire 				CLK_4_8KHZ;
 	wire 				CLK_25MHZ;
 
 	// Connections between debounce <--> PicoBlaze
@@ -105,8 +104,8 @@ module nexys4fpga (
 	// Connections between VgaCtrl <--> ImgCtrl
 
 	wire 				flgActiveVideo;
-	integer 			adrHor;
-	integer				adrVer;
+	wire 	[31:0]		adrHor;
+	wire	[31:0]		adrVer;
 
 	// Connections for 10Hz flag generator block
 
@@ -148,8 +147,7 @@ module nexys4fpga (
 		.clk_in1	(clk),					// Give ClockWiz the 100MHz crystal oscillator signal
 
 		// Clock Output ports
-		.clk4k8		(CLK_4_8KHZ),			// Generate 4.8kHz clock (not used)
-		.clk25M		(CLK_25MHZ),			// Generate 25MHz clock to use in VGA_Controller
+		.clk_out1	(CLK_25MHZ),			// Generate 25MHz clock to use in VGA_Controller
 
 		// Status and control signals
 		.reset 		(1'b0),					// active-high reset for the clock generator
@@ -259,7 +257,7 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.clk 					(clk), 						// I [ 0 ]
+		.ck100MHz 					(clk), 					// I [ 0 ]
 
 		// Time-domain signals
 
