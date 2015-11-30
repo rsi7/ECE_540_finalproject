@@ -12,25 +12,8 @@ $ cat .gitignore
 # these are just PDFs and Word files
 # available on D2L course website
 
-#/docs/*
+/docs/*
 
-# exclude all files in firmware
-# except verilog & assembly code
+# exclude reference code
 
-firmware/*
-!/firmware/*.v
-!/firmware/*.psm
-
-# exclude all files in hdl_part1
-# except for verilog & assembly code
-# (uncomment to enable)
-
-# hdl_part1/*
-# !/hdl_part1/*.v
-# !/hdl_part1/*.psm
-
-# also exclude source & testbench folders
-# (uncomment to enable)
-
-# !/hdl_part1/source/
-# !/hdl_part1/testbench/
+/ref/*
