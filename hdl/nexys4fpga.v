@@ -256,7 +256,7 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.ck100MHz 				(clk), 					// I [ 0 ]
+		.ck100MHz 				(clk), 						// I [ 0 ]
 
 		// Time-domain signals
 
