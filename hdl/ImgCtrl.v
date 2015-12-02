@@ -72,10 +72,10 @@ module ImgCtrl (
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  wire  [7:0]   sampleDisplayTime;    // time domain sample for display
-  wire  [7:0]   sampleDisplayFreq;    // freq domain sample for display
-  wire  [9:0]   vecadrHor;            // pixel column counter
-  wire  [9:0]   vecadrVer;            // pixel row counter
+  wire  [7:0]   sampleDisplayTime;      // time domain sample for display
+  wire  [7:0]   sampleDisplayFreq;      // freq domain sample for display
+  wire  [9:0]   vecadrHor;              // pixel column counter
+  wire  [9:0]   vecadrVer;              // pixel row counter
 
   // connections for output ports
 
