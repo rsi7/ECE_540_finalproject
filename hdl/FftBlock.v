@@ -126,15 +126,21 @@ module FftBlock (
   /* always block                                                   */
   /******************************************************************/
 
-begin
+  always@posedge( 	) begin
+  	enaTime <= intEnaTime;
+  	weaTime <= intWeaTime;
+  	ckFft <= ckaTime; 									// run at 100MHz
+  	addrFreq <= cntFftUnloadFreq;
+  	addraTime <= intAddraTime[9:0]; 					// 10 bit output
+  	intEnaTime <= !intAddraTime[10]; 					// block when cnt[10] == 1
+  	s_axis_data_tdata[7:0] <= s_axis_data_tbyte; 		// real part of the time data
+  	s_axis_data_tdata[15:8] <= (others => '0'); 		// imaginary part of the time data
+  end
 
-   enaTime <= intEnaTime;
-   weaTime <= intWeaTime;
---   addraTime <= intAddraTime;
-   
-   ckFft <= ckaTime; -- run at 100MHz
 
-
+  /******************************************************************/
+  /* always block                                                   */
+  /******************************************************************/
 
    ResetStateMachine: process (ckFft)
    begin
@@ -192,90 +198,93 @@ begin
       end case;      
    end process;
 
-   addraTime <= intAddraTime(9 downto 0);  -- 10bit out
-   intEnaTime <= not intAddraTime(10);  -- blocked when cnt(10) = 1
 
-TimeAcqSync: process(ckaTime)  -- sync time acquisition on rising edge at level zero
-   begin
-   if rising_edge(ckaTime) then
-      if intWeaTime = '1' then
-         oldDinaTime <= dinaTime;   -- store current sample for later
-      end if;   
-      if flgStartAcquisition = '1' then
-         flgReset <= '1';
-      elsif intWeaTime = '1' and -- valid sample
-            oldDinaTime < 0 and  -- last sample negative
-            dinaTime >= 0 then    -- current sample positive
-         flgReset <= '0';
-      end if;
-   end if;
-end process;                    
+  /******************************************************************/
+  /* TimeAcqSync block                                              */
+  /******************************************************************/
+
+  always@posedge(ckaTime) begin 			// sync time acquisition on rising edge at level zero
+  	if (intWeaTime == 1) begin
+  		oldDinaTime <= dinaTime; 			// store current sample for later
+  	end
+  	if (flgStartAcquisition == 1) begin
+  		flgReset <= 1'b1;
+  	end
+  	else if ((intWeaTime == 1) && (oldDinaTime < 0) && (dinaTime >= 0)) begin 		// valid sample && last sample negative && current sample positive
+  		flgReset <= 1'b0;
+  	end
+  end
+
+  /******************************************************************/
+  /* TimeCounter block                                              */
+  /******************************************************************/                 
    
-TimeCounter: process(ckaTime)
-   begin
-      if rising_edge(ckaTime) then
-         if flgReset = '1' then
-            intAddraTime <= (others => '0');
-         elsif intWeaTime = '1' then
-            if intAddraTime(10) = '1' then -- blocking condition
-               null;
-            else
-               intAddraTime <= intAddraTime + '1';
-            end if;
-         end if;
-      end if;
-   end process;                    
+   always@posedge(ckaTime) begin
+	if (flgReset == 1) begin
+		intAddraTime <= (others => '0');
+	end
+	else if (intWeaTime == 1) begin
+		if (intAddraTime[10] == 1) begin 			// blocking condition
+			null;
+		end
+		else begin
+			intAddraTime <= intAddraTime + 1;
+		end
+	end   	
+   end
 
-FftLoadCounter: process(ckFft)
-   begin
-      if rising_edge(ckFft) then
-         if s_axis_data_tready = '1' then
-            cntFftLoadTime <= cntFftLoadTime + '1';
-         end if;
-         flgCountLoad <= '1'; -- active low
-         if cntFftLoadTime = "1111111110" then
---            cntFftLoadTime <= (others => '0');  -- reset (useles)
-            flgCountLoad <= '0'; -- active low
-         end if;   
---         if event_tlast_missing = '1' then  -- lost of sync
-         if aresetn = '0' then  -- fft reset
-            cntFftLoadTime <= (others => '0');  -- reset (sync with fft)
-         end if;   
-      end if;
-   end process;      
+  /******************************************************************/
+  /* FftLoadCounter block                                           */
+  /******************************************************************/             
 
-FftUnloadCounter: process(ckFft)
-   begin
-      if rising_edge(ckFft) then
-         cntFftUnloadFreq <= cntFftUnloadFreq + '1';
-         if cntFftUnloadFreq = "1111111111" then
-            cntFftUnloadFreq <= (others => '0');  -- reset (useles)
-         elsif m_axis_data_tlast = '1' then  -- sync
-            cntFftUnloadFreq <= (others => '0');  -- reset (sync)
-         end if;   
-      end if;
-   end process;      
+  always@posedge(ckFft) begin
+  	if (s_axis_data_tready == 1) begin
+  		cntFftLoadTime <= cntFftLoadTime + 1;
+  	end
+  	flgCountLoad <= 1'b1; 							// active low
+  	if (cntFftLoadTime == 10'b1111111110) begin
+  		flgCountLoad <= 1'b0; 						// active low
+  	end
+  	if (aresetn == 0) begin 						// fft reset
+  		cntFftLoadTime <= (others => '0'); 			// reset (sync with fft)
+  	end
+  end
 
-   addrFreq <= cntFftUnloadFreq;
-   
+  /******************************************************************/
+  /* FftUnloadCounter block                                         */
+  /******************************************************************/     
 
-   s_axis_data_tdata(7 downto 0) <= s_axis_data_tbyte ;  -- real part of the time data
-   s_axis_data_tdata(15 downto 8) <= (others => '0');    -- imaginary part of the time data
+  always@(posedge ckFft) begin
+  	cntFftUnloadFreq <= cntFftUnloadFreq + 1;
+  	if (cntFftUnloadFreq == 10'b1111111111) begin
+  		cntFftUnloadFreq <= (others => '0'); 		// reset (useless)
+  	end
+  	else if (m_axis_data_tlast == 1) begin 			// sync
+  		cntFftUnloadFreq <= (others => '0'); 		// reset (sync)
+  	end
+  end
 
-   m_axis_data_tpower <= m_axis_data_tdata(18 downto 1) * m_axis_data_tdata(18 downto 1) +   -- 18x18 bit multiplication
-                         m_axis_data_tdata(42 downto 25) * m_axis_data_tdata(42 downto 25);  -- 36 bit signaed result (always positive)
-   -- m_axis_data_tdata has 19 significant bits in each real and immaginary parts  
-     
-   byteFreqSample <= m_axis_data_tpower(30 downto 23) when sw(2 downto 0) = "000" else  -- FFT output range (gain) 
-                     m_axis_data_tpower(29 downto 22) when sw(2 downto 0) = "001" else
-                     m_axis_data_tpower(28 downto 21) when sw(2 downto 0) = "010" else
-                     m_axis_data_tpower(27 downto 20) when sw(2 downto 0) = "011" else
-                     m_axis_data_tpower(26 downto 19) when sw(2 downto 0) = "100" else
-                     m_axis_data_tpower(25 downto 18) when sw(2 downto 0) = "101" else
-                     m_axis_data_tpower(24 downto 17) when sw(2 downto 0) = "110" else
-                     m_axis_data_tpower(23 downto 16);-- when sw(2 downto 0) = "111" else
-                       
---  debugm_axis_data_tbyte <= m_axis_data_tbyte; -- debug                         
+  /******************************************************************/
+  /* m_axis_data_tdata block                                        */
+  /******************************************************************/ 
 
+  // 18x18 bit multiplication --> 36 bit signed result (always Positive)
+  // m_axis_data_tdata has 19 significant bits each in real part & imaginary part
 
-end Behavioral;
+  always@posedge( 	) begin
+  	
+  	m_axis_data_tpower <= (m_axis_data_tdata[18:1] * m_axis_data_tdata[18:1]) + (m_axis_data_tdata[42:25] * m_axis_data_tdata[42:25])
+  	
+  	case (sw[2:0]) begin 		// FFT output range (gain)
+  		000 : byteFreqSample <= m_axis_data_tpower[30:23];
+  		001 : byteFreqSample <= m_axis_data_tpower[29:22];
+  		010 : byteFreqSample <= m_axis_data_tpower[28:21];
+  		011 : byteFreqSample <= m_axis_data_tpower[27:20];
+  		100 : byteFreqSample <= m_axis_data_tpower[26:19];
+  		101 : byteFreqSample <= m_axis_data_tpower[25:18];
+  		110 : byteFreqSample <= m_axis_data_tpower[24:17];
+  		111 : byteFreqSample <= m_axis_data_tpower[23:16];
+  	end
+  end                        
+
+endmodule
