@@ -122,17 +122,18 @@ module pdm_filter #
 		// Outputing the microphone clock
  
   
-		assign 		clk_3_072MHz	= clk_locked ? clk_3_072MHz_int : 1'b1 ; 			//(  clk_3_072MHz <= clk_3_072MHz_int when clk_locked = '1' else '1';)
+			assign 		clk_3_072MHz	= clk_locked ? clk_3_072MHz_int : 1'b1 ; 			//(  clk_3_072MHz <= clk_3_072MHz_int when clk_locked = '1' else '1';)
 		
 		
-		always @(posedge clk_i) begin
+			
+			always @(posedge clk_i) begin
 		
-				pdm_clk_o 		<= clk_3_072MHz;
+					pdm_clk_o 		<= clk_3_072MHz;
 	
-				pdm_lrsel_o 	<= 1'b0;
+					pdm_lrsel_o 	<= 1'b0;
 				
-				fs_o 			<= 	m_lp_tvalid;
-		end
+					fs_o 			<= 	m_lp_tvalid;
+			end
 		
 		
 		
@@ -140,8 +141,9 @@ module pdm_filter #
 		
 		
 		
-		assign s_cic_tdata [7:1] 	= { 7 {! pdm_data_i} } ;							//s_cic_tdata(7 downto 1) <= (others => (not pdm_data_i));
-		assign s_cic_tdata [0] 		= 1'b1 ;
+			assign 		s_cic_tdata [7:1] 	= { 7 {! pdm_data_i} } ;							//s_cic_tdata(7 downto 1) <= (others => (not pdm_data_i));
+		
+			assign 		s_cic_tdata [0] 		= 1'b1 ;
    
    //First stage: CIC decimator.
    // This filter downsample's the incomming 3.072 MHz signal to 192 kHz.
