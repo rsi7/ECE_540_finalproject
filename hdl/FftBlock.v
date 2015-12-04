@@ -139,65 +139,43 @@ module FftBlock (
 
 
   /******************************************************************/
-  /* always block                                                   */
+  /* AXI FSM (3 'always' block style)                               */
   /******************************************************************/
 
-   ResetStateMachine: process (ckFft)
-   begin
-      if (ckFftevent and ckFft = '1') then
---         if (btnL = '1') then      -- reset laod state machine
---            stAxiLoadCur <= stRes0;
---         else  
-            stAxiLoadCur <= stAxiLoadNext;
---         end if;        
-      end if;
-   end process;
- 
-   --MOORE State-Machine - Outputs based on state only
-   OUTPUT_DECODE: process (stAxiLoadCur)
-   begin
-   -- default values
-      aresetn <= '1';  -- inactive
-      s_axis_config_tvalid <= '1';  -- make it always active (config data  always vaslid)
---      s_axis_data_tvalid <= '0';  
-      s_axis_data_tvalid <= '1';  -- debug ALWAYS valid
-      s_axis_data_tlast <= not flgCountLoad;  --  not active while counting;
-      m_axis_data_tready <= '1';  -- always ready to get frequency samples
-      
-      if stAxiLoadCur = stRes0 or stAxiLoadCur = stRes1  then
-         aresetn <= '0';  -- active
-      end if;
+  always@posedge(ckFft) begin
+    if(btnL == 1) begin
+      stAxiLoadCur <= stRes0;
+    end
+    else begin
+      stAxiLoadCur <= stAxiLoadNext;
+    end
+  end
 
-   end process;
- 
-   NEXT_STATE_DECODE: process (stAxiLoadCur)
-   begin
-      --declare default state for next_state to avoid latches
-      stAxiLoadNext <= stAxiLoadCur;  --default is to stay in current state
+  always@posedge(ckFft) begin
+    stAxiLoadNext <= 2'bx;
 
-      case (stAxiLoadCur) is
-         when stRes0 =>
-               stAxiLoadNext <= stRes1;
+    case (stAxiLoadCur) begin
+      stRes0 : stAxiLoadNext <= stRes1;
+      stRes1 : stAxiLoadNext <= stConfig;
+      stConfig : stAxiLoadNext <= s_axis_config_tready ? stIdle : stConfig;
+      stIdle : stAxiLoadNext <= stIdle;        
+      endcase
+        
+    end
+  end
 
-         when stRes1 =>
-               stAxiLoadNext <= stConfig;
+  always@posedge(ckFft) begin
+    s_axis_config_tvalid <= 1'b1;               // config data always valid
+    s_axis_data_tvalid <= 1'b1;                 // debug always valid
+    s_axis_data_tlast <= !(flgCountLoad);       // not active while counting
+    m_axis_data_tready <= 1'b1;                 // always ready to get frequency samples
 
-         when stConfig =>
-            if s_axis_config_tready = '1' then
-               stAxiLoadNext <= stIdle;
-            end if;
+    case (stAxiLoadCur) begin
+      stRes0, stRes1 : aresetn <= 1'b0;
+      stConfig, stIdle : aresetn <= 1'b1;
+    endcase
 
--- stay forever in stIdle
-
-         when stIdle =>
-            null;
-
-         when others =>
-            stAxiLoadNext <= stRes0;
-            
-      end case;      
-   end process;
-
+  end
 
   /******************************************************************/
   /* TimeAcqSync block                                              */
@@ -205,7 +183,7 @@ module FftBlock (
 
   always@posedge(ckaTime) begin 			// sync time acquisition on rising edge at level zero
   	if (intWeaTime == 1) begin
-  		oldDinaTime <= dinaTime; 			// store current sample for later
+  		oldDinaTime <= dinaTime; 			  // store current sample for later
   	end
   	if (flgStartAcquisition == 1) begin
   		flgReset <= 1'b1;
