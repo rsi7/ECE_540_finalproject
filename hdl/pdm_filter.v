@@ -17,16 +17,16 @@ module pdm_filter #
 	/* PDM interface to microphone				          	          */
 	/******************************************************************/
 	  
-			output					reg			pdm_clk_o,         
-			output 					reg			pdm_lrsel_o,       
+			output		reg						pdm_clk_o,         
+			output 		reg						pdm_lrsel_o,       
 			input 								pdm_data_i,      
       
     /******************************************************************/
 	/* output data								          	          */
 	/******************************************************************/
 	  
-			output					reg			fs_o,              
-			output		[15:0]		reg			data_o            
+			output		reg						fs_o,              
+			output		reg		[15:0]			data_o            
 
 );
 
@@ -83,10 +83,10 @@ module pdm_filter #
 			
 			clk_gen  ClkGen(
    
-					.clk_100MHz_i (clk_i),
-					.clk_6_144MHz_o(clk_6_144MHz_int),
-					.rst_i (rst_i),
-					.locked_o (clk_locked)
+					.clk_100MHz_i 		(clk_i),
+					.clk_6_144MHz_o		(clk_6_144MHz_int),
+					.rst_i 				(rst_i),
+					.locked_o 			(clk_locked)
 	  
 					);
    
@@ -96,15 +96,15 @@ module pdm_filter #
    
 			BUFR  #(
       
-					.BUFR_DIVIDE(2),
-					.SIM_DEVICE(7SERIES))
+					.BUFR_DIVIDE		(2),
+					.SIM_DEVICE			("7SERIES"))
   
-			ClkDiv2(
+			ClkDiv2 (
 					
-					.O( clk_6_144MHz_div)
-					.CE(1),
-					.CLR (0),
-					.I(clk_6_144MHz_int));
+					.O					( clk_6_144MHz_div),
+					.CE					(1),
+					.CLR 				(0),
+					.I					(clk_6_144MHz_int));
 					
 					
    
@@ -114,29 +114,34 @@ module pdm_filter #
 			BUFG ClkDivBuf(
       
 	  
-					.O (clk_3_072MHz_int),
-					.I (clk_6_144MHz_div));
+					.O					(clk_3_072MHz_int),
+					.I 					(clk_6_144MHz_div));
 					
 		
 		
 		// Outputing the microphone clock
  
   
-		assign 		clk_3_072MHz	<= clk_locked ? clk_3_072MHz_int : 1'b1 ; 			//(  clk_3_072MHz <= clk_3_072MHz_int when clk_locked = '1' else '1';)
-		assign 		pdm_clk_o 		<= clk_3_072MHz;
+		assign 		clk_3_072MHz	= clk_locked ? clk_3_072MHz_int : 1'b1 ; 			//(  clk_3_072MHz <= clk_3_072MHz_int when clk_locked = '1' else '1';)
+		
+		
+		always @(posedge clk_i) begin
+		
+				pdm_clk_o 		<= clk_3_072MHz;
 	
-		assign		pdm_lrsel_o 	<= '0';
+				pdm_lrsel_o 	<= 1'b0;
+				
+				fs_o 			<= 	m_lp_tvalid;
+		end
 		
 		
 		
+	
 		
 		
 		
-		
-		
-		
-		assign s_cic_tdata [7:1] <= 7 {! pdm_data_i}							//s_cic_tdata(7 downto 1) <= (others => (not pdm_data_i));
-		assign s_cic_tdata [0] <= 1'b1;
+		assign s_cic_tdata [7:1] 	= { 7 {! pdm_data_i} } ;							//s_cic_tdata(7 downto 1) <= (others => (not pdm_data_i));
+		assign s_cic_tdata [0] 		= 1'b1 ;
    
    //First stage: CIC decimator.
    // This filter downsample's the incomming 3.072 MHz signal to 192 kHz.
@@ -175,19 +180,19 @@ module pdm_filter #
 				.m_axis_data_tvalid   	(m_lp_tvalid),
 				.m_axis_data_tdata    	(m_lp_tdata));
    
-   -- Fourth stage: First order highpass filter, used for removing any 
-   -- DC component.
+	//Fourth stage: First order highpass filter, used for removing any 
+	// DC component.
    hp_rc HP(
    
    
 				.clk_i                (clk_3_072MHz),
 				.rst_i                (rst_i),
 				.en_i                 (m_lp_tvalid),
-				.data_i               (m_lp_tdata[16:1],
+				.data_i               (m_lp_tdata [16:1]),
 				.data_o               (data_o));
    
    
-   assign		fs_o <= m_lp_tvalid;
+		
 		
 
 
