@@ -48,7 +48,7 @@ module audio_demo (
    pdm_filter PDM (
 
       // Global signals
-      .clk_i         (clk_i),             // I [ 0 ] 100MHz system clock
+      .clk_i         (clk_i),               // I [ 0 ] 100MHz system clock
       .rst_i         (rst_i),               // I [ 0 ] active-high system reset
 
       // PDM interface to microphone
