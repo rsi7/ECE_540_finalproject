@@ -69,23 +69,37 @@ module audio_demo (
       
 						.fs_o          (fs_int),              // O [ 0 ]
 						.data_o        (data_int));           // O [15:0]
-
+						
+						
+	
    /******************************************************************/
-   /* always modules                                                 */
+   /* assignments                                                 */
    /******************************************************************/
    
    
-
-			always @(posedge clk_i) begin
-     
-
-					fs_tmp 		<= fs_int;
+   			assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
+   /*
+   
+			always@ (posedge clk_i) begin
+      
+	  
+					if ((cnt == 1) && (fs_rise == 1)) begin
+         
+						
+							fs_comb <= 1;
+					end
 				
-					fss_tmp 	<= fs_tmp;
+					else begin
+							
+							fs_comb <= 0;
+					end
 			end
+
+		
+	*/
    
    
-			assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
+   			assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
    
    
    /*
@@ -107,6 +121,25 @@ module audio_demo (
 		end
 
    */
+						
+	
+
+   /******************************************************************/
+   /* always modules                                                 */
+   /******************************************************************/
+   
+   
+
+			always @(posedge clk_i) begin
+     
+
+					fs_tmp 		<= fs_int;
+				
+					fss_tmp 	<= fs_tmp;
+			end
+   
+   
+
    
    // divide the fs by 2, resulting in 48kHz impulse rate
 
@@ -138,26 +171,7 @@ module audio_demo (
    
    
    
-			assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
-   /*
-   
-			always@ (posedge clk_i) begin
-      
-	  
-					if ((cnt == 1) && (fs_rise == 1)) begin
-         
-						
-							fs_comb <= 1;
-					end
-				
-					else begin
-							
-							fs_comb <= 0;
-					end
-			end
-
-		
-	*/	
+	
 			always @ (posedge clk_i) begin
       
 	  
