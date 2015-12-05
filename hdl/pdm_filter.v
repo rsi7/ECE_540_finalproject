@@ -143,7 +143,7 @@ module pdm_filter #
 		
 			assign 		s_cic_tdata [7:1] 	= { 7 {! pdm_data_i} } ;							//s_cic_tdata(7 downto 1) <= (others => (not pdm_data_i));
 		
-			assign 		s_cic_tdata [0] 		= 1'b1 ;
+			assign 		s_cic_tdata [0] 	= 1'b1 ;
    
    //First stage: CIC decimator.
    // This filter downsample's the incomming 3.072 MHz signal to 192 kHz.
