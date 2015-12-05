@@ -20,21 +20,30 @@ module ImgCtrl (
 
   // frequency domain data signals
 
-  input           enaFreq,
+//input           enaFreq,
   input           weaFreq,
   input   [9:0]   addraFreq,
   input   [7:0]   dinaFreq,
 
-  // video signals
+  // video timing signals
 
   input           ckVideo,
   input           flgActiveVideo,
   input   [9:0]   adrHor,
   input   [9:0]   adrVer,
+
+  // color signal outputs
+
   output  [3:0]   red,
   output  [3:0]   green,
   output  [3:0]   blue);
 
+  /******************************************************************/
+  /* Local parameters and variables                         */
+  /******************************************************************/
+
+  localparam      cstHorSize = 800;
+  localparam      cstVerSize = 521;
 
   /******************************************************************/
   /* TimeBlkMemForDisplay instantiation                             */
@@ -62,11 +71,11 @@ module ImgCtrl (
     .ena      (1'b1),                    // I [ 0 ]
     .wea      (weaFreq),                 // I [ 0 ]
     .addra    (addraFreq),               // I [9:0]
-    .dina     (dinaFreq),                // I [7:0]
+    .dina     (dinaFreq),                // I [7:0] selected byte
     .clkb     (ckVideo),                 // I [ 0 ]
     .enb      (1'b1);                    // I [ 0 ]
     .addrb    ({3'b0,vecadrHor[9:3]}),   // I [9:0] divide by 8 (display 640/8 = 80 points; point = 96kHz/512 = 187.5Hz)
-    .doutb    (sampleDisplayTime));      // I [7:0]
+    .doutb    (sampleDisplayFreq));      // I [7:0]
 
   /******************************************************************/
   /* Local parameters and variables                                 */
@@ -113,6 +122,10 @@ module ImgCtrl (
       intBlue <= 4'b0000;
     end
   end
+
+  /******************************************************************/
+  /* RGB outputs for current pixel                                  */
+  /******************************************************************/
 
   always@posedge(ckVideo) begin
     if (flgActiveVideo == 1) begin

@@ -276,8 +276,8 @@ module nexys4fpga (
 
 		.ckVideo				(CLK_25MHZ),				// I [ 0 ]
 		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ]
-		.adrHor					(adrHor),					// I [31:0]
-		.adrVer					(adrVer),					// I [31:0]
+		.adrHor					(adrHor),					// I [9:0]
+		.adrVer					(adrVer),					// I [9:0]
 		.red 					(vgaRed),					// O [3:0]
 		.green 					(vgaGreen),					// O [3:0]
 		.blue 					(vgaBlue));					// O [3:0]

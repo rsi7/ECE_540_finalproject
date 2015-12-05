@@ -60,8 +60,13 @@ module FftBlock (
 
   // AXI state machine signals
 
-  // type typeAxiLoad is (stRes0, stRes1, stConfig, stIdle);
-  // signal stAxiLoadCur, stAxiLoadNext: typeAxiLoad := stRes0;
+  localparam stRes0 	= 4'b0001;
+  localparam stRes1 	= 4'b0010;
+  localparam stConfig 	= 4'b0100;
+  localparam stIdle 	= 4'b1000;
+
+  reg 	stAxiLoadNext;
+  reg 	stAxiLoadCur;
    
   // time acquisition signals
 
@@ -75,10 +80,10 @@ module FftBlock (
   wire            flgCountLoad;           // active while counting
   wire            cenLoadCounter;         // count enable for Load counter
   wire            cenUnloadCounter;       // count enable for Unload counter
-  wire            ckFft;                  // clock inside FFT block
+
+  // 18x18 bit multiplication for signal power
 
   wire    [35:0]  m_axis_data_tpower;     // 18x18 bit multiplication
-
 
   /******************************************************************/
   /* TimeBlkMemForFft instantiation                                 */
@@ -89,9 +94,9 @@ module FftBlock (
     .clka     (ckaTime),              // I [ 0 ]
     .ena      (intEnaTime),           // I [ 0 ]
     .wea      (intWeaTime),           // I [ 0 ]
-    .addra    (intAddraTime),         // I [9:0]
+    .addra    (intAddraTime[9:0]),    // I [9:0]
     .dina     (dinaTime),             // I [7:0]
-    .clkb     (ckFft),                // I [ 0 ]
+    .clkb     (ckaTime),              // I [ 0 ]
     .enb      (1'b1),                 // I [ 0 ]
     .addrb    (cntFftLoadTime),       // I [9:0]
     .doutb    (s_axis_data_tbyte));   // O [7:0]
@@ -102,7 +107,7 @@ module FftBlock (
 
   xfft_1 FftInst (
     
-    .aclk                           (ckFft),                            // I [ 0 ]
+    .aclk                           (ckaTime),                          // I [ 0 ]
     .aresetn                        (aresetn),                          // I [ 0 ]
     .s_axis_config_tdata            (s_axis_config_tdata),              // I [7:0]
     .s_axis_config_tvalid           (s_axis_config_tvalid),             // I [ 0 ]
@@ -123,26 +128,33 @@ module FftBlock (
     .event_data_out_channel_halt    (event_data_out_channel_halt));     // O [ 0 ]
 
   /******************************************************************/
-  /* always block                                                   */
+  /* Output registers block                                         */
   /******************************************************************/
 
-  always@posedge( 	) begin
+  always@posedge(ckaTime) begin
   	enaTime <= intEnaTime;
   	weaTime <= intWeaTime;
-  	ckFft <= ckaTime; 									// run at 100MHz
+  	addraTime <= intAddraTime[9:0]; 			// 10 bit output
   	addrFreq <= cntFftUnloadFreq;
-  	addraTime <= intAddraTime[9:0]; 					// 10 bit output
-  	intEnaTime <= !intAddraTime[10]; 					// block when cnt[10] == 1
-  	s_axis_data_tdata[7:0] <= s_axis_data_tbyte; 		// real part of the time data
-  	s_axis_data_tdata[15:8] <= (others => '0'); 		// imaginary part of the time data
   end
 
+  /******************************************************************/
+  /* Continuous assignment                                          */
+  /******************************************************************/
+
+  assign intEnaTime = !(intAddraTime[10]);							// block when cnt[10] == 1
+  assign s_axis_data_tdata = {8'b00000000, s_axis_data_tbyte};		// imaginary part of time data --> zero
+
+  // 18x18 bit multiplication
+  // 36-bit signed result (always positive)
+
+  assign m_axis_data_tpower = m_axis_data_tdata(18 downto 1) * m_axis_data_tdata(18 downto 1) + m_axis_data_tdata(42 downto 25) * m_axis_data_tdata(42 downto 25);
 
   /******************************************************************/
   /* AXI FSM (3 'always' block style)                               */
   /******************************************************************/
 
-  always@posedge(ckFft) begin
+  always@posedge(ckaTime) begin
     if(btnL == 1) begin
       stAxiLoadCur <= stRes0;
     end
@@ -151,7 +163,7 @@ module FftBlock (
     end
   end
 
-  always@posedge(ckFft) begin
+  always@posedge(ckaTime) begin
     stAxiLoadNext <= 2'bx;
 
     case (stAxiLoadCur) begin
@@ -159,12 +171,11 @@ module FftBlock (
       stRes1 : stAxiLoadNext <= stConfig;
       stConfig : stAxiLoadNext <= s_axis_config_tready ? stIdle : stConfig;
       stIdle : stAxiLoadNext <= stIdle;        
-      endcase
-        
-    end
+    endcase
+
   end
 
-  always@posedge(ckFft) begin
+  always@posedge(ckaTime) begin
     s_axis_config_tvalid <= 1'b1;               // config data always valid
     s_axis_data_tvalid <= 1'b1;                 // debug always valid
     s_axis_data_tlast <= !(flgCountLoad);       // not active while counting
@@ -181,9 +192,9 @@ module FftBlock (
   /* TimeAcqSync block                                              */
   /******************************************************************/
 
-  always@posedge(ckaTime) begin 			// sync time acquisition on rising edge at level zero
+  always@posedge(ckaTime) begin 				// sync time acquisition on rising edge
   	if (intWeaTime == 1) begin
-  		oldDinaTime <= dinaTime; 			  // store current sample for later
+  		oldDinaTime <= dinaTime; 			  	// store current sample for later
   	end
   	if (flgStartAcquisition == 1) begin
   		flgReset <= 1'b1;
@@ -199,11 +210,11 @@ module FftBlock (
    
    always@posedge(ckaTime) begin
 	if (flgReset == 1) begin
-		intAddraTime <= (others => '0');
+		intAddraTime <= (10'b0000000000);
 	end
 	else if (intWeaTime == 1) begin
 		if (intAddraTime[10] == 1) begin 			// blocking condition
-			null;
+		// do nothing (null)
 		end
 		else begin
 			intAddraTime <= intAddraTime + 1;
@@ -215,7 +226,7 @@ module FftBlock (
   /* FftLoadCounter block                                           */
   /******************************************************************/             
 
-  always@posedge(ckFft) begin
+  always@posedge(ckaTime) begin
   	if (s_axis_data_tready == 1) begin
   		cntFftLoadTime <= cntFftLoadTime + 1;
   	end
@@ -224,7 +235,7 @@ module FftBlock (
   		flgCountLoad <= 1'b0; 						// active low
   	end
   	if (aresetn == 0) begin 						// fft reset
-  		cntFftLoadTime <= (others => '0'); 			// reset (sync with fft)
+  		cntFftLoadTime <= 10'b0000000000); 			// reset (sync with fft)
   	end
   end
 
@@ -232,13 +243,13 @@ module FftBlock (
   /* FftUnloadCounter block                                         */
   /******************************************************************/     
 
-  always@(posedge ckFft) begin
+  always@(posedge ckaTime) begin
   	cntFftUnloadFreq <= cntFftUnloadFreq + 1;
   	if (cntFftUnloadFreq == 10'b1111111111) begin
-  		cntFftUnloadFreq <= (others => '0'); 		// reset (useless)
+  		cntFftUnloadFreq <= 10'b0000000000; 		// reset (useless)
   	end
   	else if (m_axis_data_tlast == 1) begin 			// sync
-  		cntFftUnloadFreq <= (others => '0'); 		// reset (sync)
+  		cntFftUnloadFreq <= 10'b0000000000; 		// reset (sync)
   	end
   end
 
@@ -249,10 +260,7 @@ module FftBlock (
   // 18x18 bit multiplication --> 36 bit signed result (always Positive)
   // m_axis_data_tdata has 19 significant bits each in real part & imaginary part
 
-  always@posedge( 	) begin
-  	
-  	m_axis_data_tpower <= (m_axis_data_tdata[18:1] * m_axis_data_tdata[18:1]) + (m_axis_data_tdata[42:25] * m_axis_data_tdata[42:25])
-  	
+  always@posedge(ckaTime) begin  	
   	case (sw[2:0]) begin 		// FFT output range (gain)
   		000 : byteFreqSample <= m_axis_data_tpower[30:23];
   		001 : byteFreqSample <= m_axis_data_tpower[29:22];
@@ -262,7 +270,7 @@ module FftBlock (
   		101 : byteFreqSample <= m_axis_data_tpower[25:18];
   		110 : byteFreqSample <= m_axis_data_tpower[24:17];
   		111 : byteFreqSample <= m_axis_data_tpower[23:16];
-  	end
+  	endcase
   end                        
 
 endmodule
