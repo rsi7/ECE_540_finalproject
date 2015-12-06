@@ -43,10 +43,10 @@ module VgaCtrl (
   localparam        cstVerPw = 2;       // # of lines: pulse with
   localparam        cstVerBp = 29;      // # of lines: back porch
 
-  wire              inHS;               // Horizontal Sync (internal)
-  wire              inVS;               // Vertical Sync (internal)
-  wire              inAl;               // Active Line (internal)
-  wire              inAf;               // Active Frame (internal)
+  reg               inHS;               // Horizontal Sync (internal)
+  reg               inVS;               // Vertical Sync (internal)
+  reg               inAl;               // Active Line (internal)
+  reg               inAf;               // Active Frame (internal)
 
   /******************************************************************/
   /* HorCounter block                                               */
