@@ -5,8 +5,8 @@
 
 module ImgCtrl #(
 				
-				parameter				cstHorSize 	= 800;
-				parameter				cstVerAf	= 480; 
+				parameter				cstHorSize 	= 800,
+				parameter				cstVerAf	= 480 
 					
 
 )(
@@ -75,20 +75,20 @@ module ImgCtrl #(
 				
 				
 				
-				wire			[9:0]	temp_adrHor		= (adrHor = 1*48) ||  (adrHor = 2*48) ||  adrHor = 3*48) ||  (adrHor = 4*48) ||  
+				wire			[9:0]	temp_adrHor		= ((adrHor == 1*48) ||  (adrHor == 2*48) ||  (adrHor == 3*48) ||  (adrHor == 4*48) ||  
 													
-															(adrHor = 5*48) ||   (adrHor = 6*48) ||  (adrHor = 7*48) ||   (adrHor = 8*48) ||  
+															(adrHor == 5*48) ||   (adrHor == 6*48) ||  (adrHor == 7*48) ||   (adrHor == 8*48) ||  
 								
 															((adrHor >=  9*48) &&  (adrHor <= 10*48)) ||  
 														
-															(adrHor = 11*48) ||  (adrHor = 12*48) ||  (adrHor = 13*48)) ; 
+															(adrHor == 11*48) ||  (adrHor == 12*48) ||  (adrHor == 13*48)) ; 
 														
 				
-				wire			[9:0] 	temp_adrHor1 	=	temp_intGreen && (  adrHor/8 = 0 ||  adrHor/8 = 10 ||  
+				wire			[9:0] 	temp_adrHor1 	=	temp_intGreen && (  adrHor/8 == 0 ||  adrHor/8 == 10 ||  
 				
-														adrHor/8 = 20 ||  adrHor/8 = 30 ||  adrHor/8 = 40 ||  
+														adrHor/8 == 20 ||  adrHor/8 == 30 ||  adrHor/8 == 40 ||  
 														
-														adrHor/8 = 50 ||  adrHor/8 = 60 ||  adrHor/8 = 70);
+														adrHor/8 == 50 ||  adrHor/8 == 60 ||  adrHor/8 == 70);
 														
 														
 				wire			[9:0]	temp_adrVer1	=	cstVerAf*23/48;
@@ -100,7 +100,7 @@ module ImgCtrl #(
 				
 				
 				
-				assign	vecadrHor = (adrHor == cstHorSize - 1) ? {10 { 1'b0 }} : { adrHor + 1}
+				assign	vecadrHor = (adrHor == cstHorSize - 1) ? {10 { 1'b0 }} : { adrHor + 1} ;
 				assign 	vecadrVer = adrVer ;
 				
 				assign 	intRed 	 = (adrVer <= temp2) ? ((adrVer >= (temp4 -sampleDisplayTime)) ? 4'b1111: 4'b0000) : (4'b0000);
@@ -108,7 +108,7 @@ module ImgCtrl #(
 				
 				assign	intGreen = (adrVer >=  temp_intGreen ) ? 4'b1111: 4'b0000;
 				
-				assign	intBlue	=	temp_adrHor1  ? 4'b1111 : (( (adrVer >= temp_adrVer1 ) && (adrVer < temp_adrVer2) &&  temp_adrHor) ? 4'b1111: 4'b0000) : 4'b0000 ; 
+				assign	intBlue	=	temp_adrHor1  ? (4'b1111) : (( (adrVer >= temp_adrVer1 ) && (adrVer < temp_adrVer2) &&  temp_adrHor) ? 4'b1111: 4'b0000) ; 
  
  
   /******************************************************************/
@@ -151,7 +151,7 @@ module ImgCtrl #(
 						.addra    (addraTime),               // I [9:0]
 						.dina     (dinaTime),                // I [7:0]
 						.clkb     (ckVideo),                 // I [ 0 ]
-						.enb      (1'b1);                    // I [ 0 ]
+						.enb      (1'b1),                    // I [ 0 ]
 						.addrb    (vecadrHor),               // I [9:0]
 						.doutb    (sampleDisplayTime));      // I [7:0]
 						
@@ -169,7 +169,7 @@ module ImgCtrl #(
 					.addra    (addraFreq),               // I [9:0]
 					.dina     (dinaFreq),                // I [7:0]
 					.clkb     (ckVideo),                 // I [ 0 ]
-					.enb      (1'b1);                    // I [ 0 ]
+					.enb      (1'b1),                    // I [ 0 ]
 					.addrb    ({3'b0,vecadrHor[9:3]}),   // I [9:0] divide by 8 (display 640/8 = 80 points; point = 96kHz/512 = 187.5Hz)
 					.doutb    (sampleDisplayTime));      // I [7:0]
 					
