@@ -32,54 +32,54 @@ module FftBlock (
   // internal signals
 
   wire            intEnaTime;
-  wire            intWeaTime;
-  wire    [10:0]  intAddraTime;
+  wire            intWeaTime;             // does this get assigned anywhere?
+  reg    [10:0]   intAddraTime;
 
   // xfft_1 signals
 
-  wire            aresetn;
-  localparam      s_axis_config_tdata = 8'b00000000;
-  wire            s_axis_config_tvalid;
-  wire            s_axis_config_tready;
-  wire    [15:0]  s_axis_data_tdata;
-  wire    [7:0]   s_axis_data_tbyte;
-  wire            s_axis_data_tvalid;
-  wire            s_axis_data_tready;
-  wire            s_axis_data_tlast;
-  wire    [47:0]  m_axis_data_tdata;
-  wire    [7:0]   m_axis_data_tbyte;
-  wire            m_axis_data_tvalid;
-  wire            m_axis_data_tready;
-  wire            m_axis_data_tlast;
-  wire            event_frame_started;
-  wire            event_tlast_unexpected;
-  wire            event_tlast_missing;
-  wire            event_status_channel_halt;
-  wire            event_data_in_channel_halt;
-  wire            event_data_out_channel_halt;
+  reg             aresetn;                              // reset signal (set by FSM)
+  localparam      s_axis_config_tdata = 8'b00000000;    // config data
+  localparam      s_axis_config_tvalid = 1'b1;          // input flag for FFT (config data always valid) 
+  wire            s_axis_config_tready;                 // output flag from FFT
+  wire    [15:0]  s_axis_data_tdata;                    // might need to register this
+  wire    [7:0]   s_axis_data_tbyte;                    // output data from TimeBlkMemForFft
+  localparam      s_axis_data_tvalid = 1'b1;            // input flag for FFT (debug always valid)
+  wire            s_axis_data_tready;                   // output flag from FFT
+  reg             s_axis_data_tlast;                    // input flag to FFT (set by FSM)
+  wire    [47:0]  m_axis_data_tdata;                    // output data from FFT
+// wire    [7:0]   m_axis_data_tbyte;                    // a byte of 'm_axis_data_tdata' (unused)
+// wire            m_axis_data_tvalid;                   // output flag from FFT (unused)
+  localparam      m_axis_data_tready = 1'b1;            // always ready to get frequency samples
+  wire            m_axis_data_tlast;                    // output data from FFT
+// wire            event_frame_started;                 // event ouput from FFT (unused)
+// wire            event_tlast_unexpected;              // event ouput from FFT (unused)
+// wire            event_tlast_missing;                 // event ouput from FFT (unused)
+// wire            event_status_channel_halt;           // event ouput from FFT (unused)
+// wire            event_data_in_channel_halt;          // event ouput from FFT (unused)
+// wire            event_data_out_channel_halt;         // event ouput from FFT (unused)
 
   // AXI state machine signals
 
   localparam stRes0 	= 4'b0001;
   localparam stRes1 	= 4'b0010;
-  localparam stConfig 	= 4'b0100;
+  localparam stConfig = 4'b0100;
   localparam stIdle 	= 4'b1000;
 
-  reg 	stAxiLoadNext;
-  reg 	stAxiLoadCur;
+  reg   [4:0]     stAxiLoadNext;
+  reg 	[4:0]     stAxiLoadCur;
    
   // time acquisition signals
 
-  wire    [7:0]   oldDinaTime;      // previous time sample (for edge detection)
-  wire            flgReset;         // reset for time acquisition counter (includes edge sync)
+  reg   [7:0]     oldDinaTime;      // previous time sample (for edge detection)
+  reg             flgReset;         // reset for time acquisition counter (includes edge sync)
 
   // load & unload counter signals
 
-  wire    [9:0]   cntFftLoadTime;       
-  wire    [9:0]   cntFftUnloadFreq;
-  wire            flgCountLoad;           // active while counting
-  wire            cenLoadCounter;         // count enable for Load counter
-  wire            cenUnloadCounter;       // count enable for Unload counter
+  reg   [9:0]     cntFftLoadTime;       
+  reg   [9:0]     cntFftUnloadFreq;
+  reg             flgCountLoad;           // active while counting
+//reg            cenLoadCounter;         // count enable for Load counter
+//reg            cenUnloadCounter;       // count enable for Unload counter
 
   // 18x18 bit multiplication for signal power
 
@@ -120,12 +120,12 @@ module FftBlock (
     .m_axis_data_tvalid             (flgFreqSampleValid),               // O [ 0 ]
     .m_axis_data_tready             (m_axis_data_tready),               // I [ 0 ]
     .m_axis_data_tlast              (m_axis_data_tlast),                // O [ 0 ]
-    .event_frame_started            (event_frame_started),              // O [ 0 ]
-    .event_tlast_unexpected         (event_tlast_unexpected),           // O [ 0 ]
-    .event_tlast_missing            (event_tlast_missing),              // O [ 0 ]
-    .event_status_channel_halt      (event_status_channel_halt),        // O [ 0 ]
-    .event_data_in_channel_halt     (event_data_in_channel_halt),       // O [ 0 ]
-    .event_data_out_channel_halt    (event_data_out_channel_halt));     // O [ 0 ]
+    .event_frame_started            (     ),                            // O [ 0 ]
+    .event_tlast_unexpected         (     ),                            // O [ 0 ]
+    .event_tlast_missing            (     ),                            // O [ 0 ]
+    .event_status_channel_halt      (     ),                            // O [ 0 ]
+    .event_data_in_channel_halt     (     ),                            // O [ 0 ]
+    .event_data_out_channel_halt    (     ));                           // O [ 0 ]
 
   /******************************************************************/
   /* Output registers block                                         */
@@ -142,7 +142,7 @@ module FftBlock (
   /* Continuous assignment                                          */
   /******************************************************************/
 
-  assign intEnaTime = !(intAddraTime[10]);							// block when cnt[10] == 1
+  assign intEnaTime = !(intAddraTime[10]);							          // block when cnt[10] == 1
   assign s_axis_data_tdata = {8'b00000000, s_axis_data_tbyte};		// imaginary part of time data --> zero
 
   // 18x18 bit multiplication
@@ -164,7 +164,7 @@ module FftBlock (
   end
 
   always@posedge(ckaTime) begin
-    stAxiLoadNext <= 2'bx;
+    stAxiLoadNext <= 4'bxxxx;
 
     case (stAxiLoadCur) begin
       stRes0 : stAxiLoadNext <= stRes1;
@@ -176,10 +176,7 @@ module FftBlock (
   end
 
   always@posedge(ckaTime) begin
-    s_axis_config_tvalid <= 1'b1;               // config data always valid
-    s_axis_data_tvalid <= 1'b1;                 // debug always valid
     s_axis_data_tlast <= !(flgCountLoad);       // not active while counting
-    m_axis_data_tready <= 1'b1;                 // always ready to get frequency samples
 
     case (stAxiLoadCur) begin
       stRes0, stRes1 : aresetn <= 1'b0;
