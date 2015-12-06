@@ -20,9 +20,9 @@ module VgaCtrl (
 
   output reg  [9:0]  adrHor,
   output reg  [9:0]  adrVer,
-  output             flgActiveVideo,
-  output             HS,
-  output             VS);
+  output reg         flgActiveVideo,
+  output reg         HS,
+  output reg         VS);
 
   /******************************************************************/
   /* Local parameters and variables                                 */
@@ -52,7 +52,7 @@ module VgaCtrl (
   /* HorCounter block                                               */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (cntHor == cstHorSize - 1) begin
       cntHor <= 0;
     end
@@ -65,12 +65,12 @@ module VgaCtrl (
   /* HorSync block                                                  */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (cntHor == cstHorAl + cstHorFp - 1) begin
       inHS <= 1'b0;
     end
     else if (cntHor == cstHorAl + cstHorFp + cstHorPw - 1) begin
-      intHS <= 1'b1;
+      inHS <= 1'b1;
     end
   end
 
@@ -78,7 +78,7 @@ module VgaCtrl (
   /* ActiveLine block                                               */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (cntHor == cstHorSize - 1) begin
       inAl <= 1'b1;
     end
@@ -91,7 +91,7 @@ module VgaCtrl (
   /* VerCounter block                                               */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (inHS == 1) begin
       if (cntVer == cstVerSize - 1) begin
         cntVer <= 0;
@@ -106,7 +106,7 @@ module VgaCtrl (
   /* VerSync block                                                  */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (inHS == 1) begin
       if (cntVer == cstVerAf + cstVerFp - 1) begin
         inVS <= 1'b0;
@@ -121,7 +121,7 @@ module VgaCtrl (
   /* ActiveFrame block                                              */
   /******************************************************************/
   
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     if (inHS == 1) begin
       if (cntVer == cstVerSize - 1) begin
         inAf <= 1'b1;
@@ -136,7 +136,7 @@ module VgaCtrl (
   /* Output block                                                   */
   /******************************************************************/
 
-  always@posedge(ckVideo) begin
+  always@(posedge ckVideo) begin
     VS <= inVS;
     HS <= inHS;
     flgActiveVideo <= (inAl && inAf);
