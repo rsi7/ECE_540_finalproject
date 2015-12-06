@@ -244,8 +244,8 @@ module nexys4fpga (
 	VgaCtrl VGA_Controller (
 
 		.ckvideo 				(CLK_25MHZ),				// I [ 0 ]
-		.adrHor					(adrHor),					// O [31:0]
-		.adrVer					(adrVer),					// O [31:0]
+		.adrHor					(adrHor),					// O [9:0]
+		.adrVer					(adrVer),					// O [9:0]
 		.flgActiveVideo 		(flgActiveVideo),			// O [ 0 ]
 		.HS 					(Hsync),					// O [ 0 ]
 		.VS 					(Vsync));					// O [ 0 ]

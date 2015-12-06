@@ -28,13 +28,25 @@ module VgaCtrl (
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  integer           cntHor;
-  integer           cntVer;
+  reg       [9:0]   cntHor;
+  reg       [9:0]   cntVer;
 
-  wire              inHS;
-  wire              inVS;
-  wire              inAl;
-  wire              inAf;
+  localparam        cstHorSize = 800;
+  localparam        cstHorAl = 640;     // # of pixels: active line
+  localparam        cstHorFp = 16;      // # of pixels: front porch
+  localparam        cstHorPw = 96;      // # of pixels: pulse with
+  localparam        cstHorBp = 48;      // # of pixels: back porch
+
+  localparam        cstVerSize = 521;
+  localparam        cstVerAf = 480;     // # of lines: active frame
+  localparam        cstVerFp = 10;      // # of lines: front porch
+  localparam        cstVerPw = 2;       // # of lines: pulse with
+  localparam        cstVerBp = 29;      // # of lines: back porch
+
+  reg               inHS;               // Horizontal Sync (internal)
+  reg               inVS;               // Vertical Sync (internal)
+  reg               inAl;               // Active Line (internal)
+  reg               inAf;               // Active Frame (internal)
 
   /******************************************************************/
   /* HorCounter block                                               */
@@ -80,7 +92,7 @@ module VgaCtrl (
   /******************************************************************/
 
   always@posedge(ckVideo) begin
-    if (inHS ==1) begin
+    if (inHS == 1) begin
       if (cntVer == cstVerSize - 1) begin
         cntVer <= 0;
       end
