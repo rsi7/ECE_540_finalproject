@@ -18,18 +18,18 @@ module VgaCtrl (
 
   // Video timing signals
 
-  output    [9:0]   adrHor,
-  output    [9:0]   adrVer,
-  output            flgActiveVideo,
-  output            HS,
-  output            VS);
+  output reg  [9:0]  adrHor,
+  output reg  [9:0]  adrVer,
+  output             flgActiveVideo,
+  output             HS,
+  output             VS);
 
   /******************************************************************/
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  reg       [9:0]   cntHor;
-  reg       [9:0]   cntVer;
+  reg     [9:0]     cntHor;
+  reg     [9:0]     cntVer;
 
   localparam        cstHorSize = 800;
   localparam        cstHorAl = 640;     // # of pixels: active line

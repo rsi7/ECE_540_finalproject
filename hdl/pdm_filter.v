@@ -1,35 +1,22 @@
-module pdm_filter #
-			(
-			
-			
+module pdm_filter (
 
-)(
 	/******************************************************************/
-	/* Port declarations	gloabal pins			                  */
+	/* Top-level port declarations	   						          */
 	/******************************************************************/
 
+	input 	clk_i,             
+	input	rst_i,
 
-			input 								clk_i,             
-			input								rst_i,             
+	// PDM interface to microphone
+
+	output	reg		pdm_clk_o,         
+	output 	reg		pdm_lrsel_o,       
+	input 			pdm_data_i,      
       
-      
-	/******************************************************************/
-	/* PDM interface to microphone				          	          */
-	/******************************************************************/
-	  
-			output		reg						pdm_clk_o,         
-			output 		reg						pdm_lrsel_o,       
-			input 								pdm_data_i,      
-      
-    /******************************************************************/
-	/* output data								          	          */
-	/******************************************************************/
-	  
-			output		reg						fs_o,              
-			output		reg		[15:0]			data_o            
-
-);
-
+	// output data
+	
+	output	reg					fs_o,              
+	output	reg 	[15:0]		data_o);          
 
     //******************************************************************/
 	//* Clock related wires					          	      		   */
@@ -149,7 +136,7 @@ module pdm_filter #
    // This filter downsample's the incomming 3.072 MHz signal to 192 kHz.
 		
 		
-	cic  CICd(
+	cic  CIC(
   
 				.aclk 					(clk_3_072MHz),
 				.s_axis_data_tdata 		(s_cic_tdata),

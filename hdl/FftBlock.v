@@ -12,18 +12,18 @@ module FftBlock (
   /* Top-level port declarations                                    */
   /******************************************************************/
 
-  input           flgStartAcquisition,
-  input           btnL,
-  input   [2:0]   sw,
-  input           ckaTime,
-  output          enaTime,
-  output          weaTime,
-  output  [9:0]   addraTime,
-  input   [7:0]   dinaTime,
-  input           ckFreq,
-  output          flgFreqSampleValid,
-  output  [9:0]   addrFreq,
-  output  [7:0]   byteFreqSample);
+  input               flgStartAcquisition,
+  input               btnL,
+  input       [2:0]   sw,
+  input               ckaTime,
+  output reg          enaTime,
+  output reg          weaTime,
+  output reg  [9:0]   addraTime,
+  input  reg  [7:0]   dinaTime,
+  input               ckFreq,
+  output reg          flgFreqSampleValid,
+  output reg  [9:0]   addrFreq,
+  output reg  [7:0]   byteFreqSample);
 
   /******************************************************************/
   /* Local parameters and variables                                 */
@@ -32,7 +32,7 @@ module FftBlock (
   // internal signals
 
   wire            intEnaTime;
-  wire            intWeaTime;             // does this get assigned anywhere?
+  wire            intWeaTime;                           // does this get assigned anywhere?
   reg    [10:0]   intAddraTime;
 
   // xfft_1 signals
@@ -47,8 +47,8 @@ module FftBlock (
   wire            s_axis_data_tready;                   // output flag from FFT
   reg             s_axis_data_tlast;                    // input flag to FFT (set by FSM)
   wire    [47:0]  m_axis_data_tdata;                    // output data from FFT
-// wire    [7:0]   m_axis_data_tbyte;                    // a byte of 'm_axis_data_tdata' (unused)
-// wire            m_axis_data_tvalid;                   // output flag from FFT (unused)
+// wire    [7:0]   m_axis_data_tbyte;                   // a byte of 'm_axis_data_tdata' (unused)
+// wire            m_axis_data_tvalid;                  // output flag from FFT (unused)
   localparam      m_axis_data_tready = 1'b1;            // always ready to get frequency samples
   wire            m_axis_data_tlast;                    // output data from FFT
 // wire            event_frame_started;                 // event ouput from FFT (unused)
