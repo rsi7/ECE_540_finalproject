@@ -53,18 +53,12 @@ module nexys4fpga (
 
 	input 				micData,
 	output 				micClk,
-	output 				micLRSel,
-
-	// PWM interface with Audio Out
-
-	output 				pdm_data_o,
-	output 				pdm_en_o);
+	output 				micLRSel);
 
 	/******************************************************************/
 	/* Local parameters and variables				                  */
 	/******************************************************************/
 
-	parameter 			SIMULATE = 0;
 	localparam 			cstDivPresc = 10000000;		// divide the 100MHz clock for 10Hz flags
 
 	wire				sysreset;					// system reset signal - asserted high to force reset
@@ -155,9 +149,7 @@ module nexys4fpga (
 	/* debounce instantiation						                  */
 	/******************************************************************/
 
-	debounce #(.SIMULATE (SIMULATE)) 
-
-	DB (
+	debounce DB (
 
 		// connections with PicoBlaze
 
@@ -175,9 +167,7 @@ module nexys4fpga (
 	/* sevensegment instantiation					                  */
 	/******************************************************************/
 
-	sevensegment #(.SIMULATE (SIMULATE)) 
-
-	SSB (
+	sevensegment SSB (
 		
 		// connections with PicoBlaze
 
@@ -211,12 +201,7 @@ module nexys4fpga (
 		// Parallel data from MIC
 
 		.data_mic_valid 		(flgTimeSampleValid),		// O [ 0 ]  output from audio_demo and FftBlock (48MHz data enable)
-		.data_mic 				(wordTimeSample),			// O [15:0] data from PDM decoder
-
-		// PWM interface with Audio Out
-
-		.pdm_data_o 			(pdm_data_o),				// O [ 0 ]
-		.pdm_en_o 				(pdm_en_o));				// O [ 0 ]	   
+		.data_mic 				(wordTimeSample));			// O [15:0] data from PDM decoder
 
 	/******************************************************************/
 	/* FFT instantiation                       					  	  */
@@ -229,7 +214,7 @@ module nexys4fpga (
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
 		.ckaTime 				(clk),						// I [ 0 ]
 		.enaTime 				(flgTimeFrameActive),		// O [ 0 ]
-		.weaTime 				(flgTimeSampleValid),		// O [ 0 ] output from audio_demo and FftBlock
+		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] output from audio_demo and FftBlock
 		.addraTime 				(addraTime),				// O [9:0]
 		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0]
 		.ckFreq 				(CLK_25MHZ),				// I [ 0 ]
@@ -243,7 +228,7 @@ module nexys4fpga (
 
 	VgaCtrl VGA_Controller (
 
-		.ckvideo 				(CLK_25MHZ),				// I [ 0 ]
+		.ckVideo 				(CLK_25MHZ),				// I [ 0 ]
 		.adrHor					(adrHor),					// O [9:0]
 		.adrVer					(adrVer),					// O [9:0]
 		.flgActiveVideo 		(flgActiveVideo),			// O [ 0 ]

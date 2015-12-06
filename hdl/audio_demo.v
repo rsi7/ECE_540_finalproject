@@ -17,8 +17,8 @@ module audio_demo (
 
    // PDM interface with Mic
 
-	output reg         	pdm_clk_o,
-	output reg         	pdm_lrsel_o,
+	output          	pdm_clk_o,
+	output          	pdm_lrsel_o,
 	input             	pdm_data_i,
 
    // parallel data from mic

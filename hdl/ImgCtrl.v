@@ -171,7 +171,7 @@ module ImgCtrl #(
 					.clkb     (ckVideo),                 // I [ 0 ]
 					.enb      (1'b1),                    // I [ 0 ]
 					.addrb    ({3'b0,vecadrHor[9:3]}),   // I [9:0] divide by 8 (display 640/8 = 80 points; point = 96kHz/512 = 187.5Hz)
-					.doutb    (sampleDisplayTime));      // I [7:0]
+					.doutb    (sampleDisplayFreq));      // I [7:0]
 					
 					
 

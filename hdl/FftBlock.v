@@ -17,11 +17,11 @@ module FftBlock (
   input       [2:0]   sw,
   input               ckaTime,
   output reg          enaTime,
-  output reg          weaTime,
+  input               weaTime,
   output reg  [9:0]   addraTime,
-  input  reg  [7:0]   dinaTime,
+  input       [7:0]   dinaTime,
   input               ckFreq,
-  output reg          flgFreqSampleValid,
+  output              flgFreqSampleValid,
   output reg  [9:0]   addrFreq,
   output reg  [7:0]   byteFreqSample);
 
@@ -32,7 +32,6 @@ module FftBlock (
   // internal signals
 
   wire            intEnaTime;
-  wire            intWeaTime;                           // does this get assigned anywhere?
   reg    [10:0]   intAddraTime;
 
   // xfft_1 signals
@@ -93,7 +92,7 @@ module FftBlock (
 
     .clka     (ckaTime),              // I [ 0 ]
     .ena      (intEnaTime),           // I [ 0 ]
-    .wea      (intWeaTime),           // I [ 0 ]
+    .wea      (weaTime),              // I [ 0 ]
     .addra    (intAddraTime[9:0]),    // I [9:0]
     .dina     (dinaTime),             // I [7:0]
     .clkb     (ckaTime),              // I [ 0 ]
@@ -133,7 +132,6 @@ module FftBlock (
 
   always@(posedge ckaTime) begin
   	enaTime <= intEnaTime;
-  	weaTime <= intWeaTime;
   	addraTime <= intAddraTime[9:0]; 			// 10 bit output
   	addrFreq <= cntFftUnloadFreq;
   end
@@ -190,13 +188,13 @@ module FftBlock (
   /******************************************************************/
 
   always@(posedge ckaTime) begin 				// sync time acquisition on rising edge
-  	if (intWeaTime == 1) begin
+  	if (weaTime == 1) begin
   		oldDinaTime <= dinaTime; 			  	// store current sample for later
   	end
   	if (flgStartAcquisition == 1) begin
   		flgReset <= 1'b1;
   	end
-  	else if ((intWeaTime == 1) && (oldDinaTime < 0) && (dinaTime >= 0)) begin 		// valid sample && last sample negative && current sample positive
+  	else if ((weaTime == 1) && (oldDinaTime < 0) && (dinaTime >= 0)) begin 		// valid sample && last sample negative && current sample positive
   		flgReset <= 1'b0;
   	end
   end
@@ -209,7 +207,7 @@ module FftBlock (
 	if (flgReset == 1) begin
 		intAddraTime <= (10'b0000000000);
 	end
-	else if (intWeaTime == 1) begin
+	else if (weaTime == 1) begin
 		if (intAddraTime[10] == 1) begin 			// blocking condition
 		// do nothing (null)
 		end
@@ -267,6 +265,7 @@ module FftBlock (
   		101 : byteFreqSample <= m_axis_data_tpower[25:18];
   		110 : byteFreqSample <= m_axis_data_tpower[24:17];
   		111 : byteFreqSample <= m_axis_data_tpower[23:16];
+      default : byteFreqSample <= m_axis_data_tpower[30:23];
   	endcase
   end                        
 

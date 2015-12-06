@@ -56,6 +56,7 @@ module pdm_filter (
 			wire 					m_lp_tvalid ;
 			wire 					m_lp_tready ;
 			wire 		[23:0]		m_lp_tdata ;
+			wire        [15:0]      data_w_o;
 
 
 			
@@ -120,6 +121,8 @@ module pdm_filter (
 					pdm_lrsel_o 	<= 1'b0;
 				
 					fs_o 			<= 	m_lp_tvalid;
+					
+					data_o          <=  data_w_o;
 			end
 		
 		
@@ -141,7 +144,7 @@ module pdm_filter (
 				.aclk 					(clk_3_072MHz),
 				.s_axis_data_tdata 		(s_cic_tdata),
 				.s_axis_data_tvalid 	(1),
-				.s_axis_data_tready 	(open),
+				.s_axis_data_tready 	(	),
 				.m_axis_data_tdata 		(m_cic_tdata),
 				.m_axis_data_tvalid 	(m_cic_tvalid));
    
@@ -152,7 +155,7 @@ module pdm_filter (
    
 				.aclk 					(clk_3_072MHz),
 				.s_axis_data_tvalid 	(m_cic_tvalid),
-				.s_axis_data_tready 	(open),
+				.s_axis_data_tready 	(	),
 				.s_axis_data_tdata 		(m_cic_tdata),
 				.m_axis_data_tvalid 	(m_hb_tvalid),
 				.m_axis_data_tready 	(m_hb_tready),
@@ -178,7 +181,7 @@ module pdm_filter (
 				.rst_i                (rst_i),
 				.en_i                 (m_lp_tvalid),
 				.data_i               (m_lp_tdata [16:1]),
-				.data_o               (data_o));
+				.data_o               (data_w_o));
    
    
 		
