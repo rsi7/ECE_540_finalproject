@@ -13,13 +13,15 @@ module audio_demo (
    /******************************************************************/
 
 	input            	clk_i,
+	input 				clk_6_144MHz,
+	input 				clk_locked, 
 	input             	rst_i,
 
    // PDM interface with Mic
 
-	output          	pdm_clk_o,
-	output          	pdm_lrsel_o,
 	input             	pdm_data_i,
+	output 	         	pdm_clk_o,
+	output reg         	pdm_lrsel_o,
 
    // parallel data from mic
 
@@ -49,35 +51,33 @@ module audio_demo (
 
 		// Global signals
 				
-		.clk_i         (clk_i),               // I [ 0 ] 100MHz system clock
-		.rst_i         (rst_i),               // I [ 0 ] active-high system reset
+		.clk_i         	(clk_i),               	// I [ 0 ] 100MHz system clock
+		.clk_6_144MHz 	(clk_6_144MHz),			// I [ 0 ]
+		.clk_locked		(clk_locked), 			// I [ 0 ]
+		.rst_i         	(rst_i),               	// I [ 0 ] active-high system reset
 
-		// PDM interface to microphone
+		// PDM interface w/ microphone
 				
 		.pdm_clk_o     (pdm_clk_o),           // O [ 0 ]
-		.pdm_lrsel_o   (pdm_lrsel_o),         // O [ 0 ]
 		.pdm_data_i    (pdm_data_i),          // I [ 0 ]
 
-		// output data
+		// output data to audio_demo
 
 		.fs_o          (fs_int),              // O [ 0 ]
 		.data_o        (data_int));           // O [15:0]	
 	
+   /******************************************************************/
+   /* Synchronize signals from the PDM                               */
+   /******************************************************************/
+   
+	always @(posedge clk_i) begin
+		fs_tmp 	<= fs_int;
+		fss_tmp <= fs_tmp;
+	end
+
 	/******************************************************************/
 	/* Local parameters and variables				                  */
 	/******************************************************************/
-   
-   	assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
-
-/*	always@ (posedge clk_i) begin
-		if ((cnt == 1) && (fs_rise == 1)) begin  
-			fs_comb <= 1;
-		end
-
-		else begin
-			fs_comb <= 0;
-		end
-	end*/
 
    	assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
    
@@ -89,18 +89,24 @@ module audio_demo (
 		else begin	
 			fs_rise <= 1'b0;
 		end
-	end	*/		
+	end	*/	
+
+
+   	assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
+
+/*	always@ (posedge clk_i) begin
+		if ((cnt == 1) && (fs_rise == 1)) begin  
+			fs_comb <= 1;
+		end
+
+		else begin
+			fs_comb <= 0;
+		end
+	end*/	
 	
    /******************************************************************/
-   /* always modules                                                 */
+   /* Divide the fs by two (48kHz sampling rate)                     */
    /******************************************************************/
-   
-	always @(posedge clk_i) begin
-		fs_tmp 	<= fs_int;
-		fss_tmp <= fs_tmp;
-	end
-
-// divide the fs by 2, resulting in 48kHz impulse rate
 
 	always @ (posedge clk_i) begin
 
@@ -117,9 +123,14 @@ module audio_demo (
 		end
 	end
 
+   /******************************************************************/
+   /* Registered outputs						                     */
+   /******************************************************************/
+
 	always @ (posedge clk_i) begin
 		data_mic_valid 	<= fs_comb;
 		data_mic 		<= data_int;
+		pdm_lrsel_o 	<= 1'b1;
 	end
 
 endmodule

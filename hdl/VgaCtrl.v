@@ -15,6 +15,7 @@ module VgaCtrl (
   /******************************************************************/
 
   input             ckVideo,
+  input             reset,
 
   // Video timing signals
 
@@ -28,36 +29,31 @@ module VgaCtrl (
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  reg     [9:0]     cntHor;
-  reg     [9:0]     cntVer;
-
   localparam        cstHorSize = 800;
   localparam        cstHorAl = 640;     // # of pixels: active line
   localparam        cstHorFp = 16;      // # of pixels: front porch
   localparam        cstHorPw = 96;      // # of pixels: pulse with
   localparam        cstHorBp = 48;      // # of pixels: back porch
 
-  localparam        cstVerSize = 521;
+  localparam        cstVerSize = 524;
   localparam        cstVerAf = 480;     // # of lines: active frame
-  localparam        cstVerFp = 10;      // # of lines: front porch
+  localparam        cstVerFp = 11;      // # of lines: front porch
   localparam        cstVerPw = 2;       // # of lines: pulse with
-  localparam        cstVerBp = 29;      // # of lines: back porch
-
-  reg               inHS;               // Horizontal Sync (internal)
-  reg               inVS;               // Vertical Sync (internal)
-  reg               inAl;               // Active Line (internal)
-  reg               inAf;               // Active Frame (internal)
+  localparam        cstVerBp = 31;      // # of lines: back porch
 
   /******************************************************************/
   /* HorCounter block                                               */
   /******************************************************************/
 
   always@(posedge ckVideo) begin
-    if (cntHor == cstHorSize - 1) begin
-      cntHor <= 0;
+    if (reset) begin
+      adrHor <= 10'd0;
+    end
+    else if (adrHor >= 10'd799) begin
+      adrHor <= 10'd0;
     end
     else begin
-      cntHor <= cntHor + 1;
+      adrHor <= adrHor + 1'd1;
     end
   end
 
@@ -66,24 +62,11 @@ module VgaCtrl (
   /******************************************************************/
 
   always@(posedge ckVideo) begin
-    if (cntHor == cstHorAl + cstHorFp - 1) begin
-      inHS <= 1'b0;
+    if ((adrHor >= 10'd655) && (adrHor <= 10'd751)) begin
+      HS <= 1'b0;
     end
-    else if (cntHor == cstHorAl + cstHorFp + cstHorPw - 1) begin
-      inHS <= 1'b1;
-    end
-  end
-
-  /******************************************************************/
-  /* ActiveLine block                                               */
-  /******************************************************************/
-
-  always@(posedge ckVideo) begin
-    if (cntHor == cstHorSize - 1) begin
-      inAl <= 1'b1;
-    end
-    else if (cntHor == cstHorAl - 1) begin
-      inAl <= 1'b0;
+    else begin
+      HS <= 1'b1;
     end
   end
 
@@ -92,13 +75,14 @@ module VgaCtrl (
   /******************************************************************/
 
   always@(posedge ckVideo) begin
-    if (inHS == 1) begin
-      if (cntVer == cstVerSize - 1) begin
-        cntVer <= 0;
-      end
-      else begin
-        cntVer <= cntVer + 1;
-      end
+    if (reset) begin
+      adrVer <= 10'd0;
+    end
+    else if ((adrVer >= 10'd523) && (adrHor >= 10'd799)) begin
+      adrVer <= 10'd0;
+    end
+    else begin
+      adrVer <= adrVer + 1'd1;
     end
   end
 
@@ -107,41 +91,25 @@ module VgaCtrl (
   /******************************************************************/
 
   always@(posedge ckVideo) begin
-    if (inHS == 1) begin
-      if (cntVer == cstVerAf + cstVerFp - 1) begin
-        inVS <= 1'b0;
+      if ((adrVer >= 10'd490) && (adrVer <= 10'd492)) begin
+        VS <= 1'b0;
       end
-      else if (cntVer == cstVerAf + cstVerFp + cstVerPw - 1) begin
-        inVS <= 1'b1;
+      else begin
+        VS <= 1'b1;
       end
-    end
   end
 
   /******************************************************************/
-  /* ActiveFrame block                                              */
+  /* flgActiveVideo block                                           */
   /******************************************************************/
-  
+
   always@(posedge ckVideo) begin
-    if (inHS == 1) begin
-      if (cntVer == cstVerSize - 1) begin
-        inAf <= 1'b1;
-      end
-      else if (cntVer == cstVerAf - 1) begin
-        inAf <= 1'b0;
-      end
+    if ((adrHor >= 10'd639) || (adrVer >= 10'd479)) begin
+      flgActiveVideo <= 1'b0;
     end
-  end
-
-  /******************************************************************/
-  /* Output block                                                   */
-  /******************************************************************/
-
-  always@(posedge ckVideo) begin
-    VS <= inVS;
-    HS <= inHS;
-    flgActiveVideo <= (inAl && inAf);
-    adrHor <= cntHor;
-    adrVer <= cntVer;
+    else begin
+      flgActiveVideo <= 1'b1;
+    end
   end
 
 endmodule

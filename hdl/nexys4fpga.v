@@ -43,11 +43,11 @@ module nexys4fpga (
 
 	// VGA signals
 
-	output 				Hsync,					// horizontal sync pulse
-	output 				Vsync,					// vertical sync pulse
-	output 	[3:0]		vgaRed,					// red pixel data --> send to screen
-	output 	[3:0]		vgaGreen,				// green pixel data --> send to screen
-	output 	[3:0]		vgaBlue,				// blue pixel data --> send to screen
+	output 				vga_hsync,				// horizontal sync pulse
+	output 				vga_vsync,				// vertical sync pulse
+	output 	[3:0]		vga_red,				// red pixel data --> send to screen
+	output 	[3:0]		vga_green,				// green pixel data --> send to screen
+	output 	[3:0]		vga_blue,				// blue pixel data --> send to screen
 
 	// Microphone signals
 
@@ -59,13 +59,16 @@ module nexys4fpga (
 	/* Local parameters and variables				                  */
 	/******************************************************************/
 
-	localparam 			cstDivPresc = 10000000;		// divide the 100MHz clock for 10Hz flags
+	localparam 			cstDivPresc = 2500000;		// divide the 100MHz clock for 10Hz flags
 
 	wire				sysreset;					// system reset signal - asserted high to force reset
 
 	// Connections between Nexys4 <--> ClockWiz
 
+	wire 				CLK_100MHZ;
 	wire 				CLK_25MHZ;
+	wire 				CLK_6MHZ;
+	wire 				clk_locked;
 
 	// Connections between debounce <--> PicoBlaze
 
@@ -102,8 +105,11 @@ module nexys4fpga (
 	// Connections for 10Hz flag generator block
 
 	reg 				flgStartAcquisition;		// 10Hz flag
-	integer 			cntPresc;					// counter from 0 - 9999999
+	integer 			cntPresc;					// counter from 0 - 2,499,999
 
+	// debugging
+
+	reg 	[7:0]		led_reg;
 
 	/******************************************************************/
 	/* Global Assignments							                  */
@@ -114,11 +120,13 @@ module nexys4fpga (
 	assign 	dp  = segs_int [7];			// sending decimal signals --> FPGA pins
 	assign 	seg = segs_int [6:0];		// sending digit signals --> FPGA pins
 
+	assign 	led = led_reg;
+
 	/******************************************************************/
 	/* 10Hz flag generator block					                  */
 	/******************************************************************/
 
-	always@(posedge clk) begin
+	always@(posedge CLK_25MHZ) begin
 		if (cntPresc == (cstDivPresc-1)) begin
 			cntPresc <= 1'b0;
 			flgStartAcquisition <= 1'b1;
@@ -129,6 +137,11 @@ module nexys4fpga (
 		end
 	end
 
+	always@(posedge CLK_25MHZ) begin
+		if (flgStartAcquisition) begin
+			led_reg <= byteFreqSample;
+		end
+	end
 	/******************************************************************/
 	/* ClockWiz instantiation		           	                      */
 	/******************************************************************/
@@ -140,10 +153,12 @@ module nexys4fpga (
 
 		// Clock Output ports
 		.clk_out1	(CLK_25MHZ),			// Generate 25MHz clock to use in VGA_Controller
+		.clk_out2 	(CLK_6MHZ),				// Generate 6MHz clock to use in pdm_filter
+		.clk_out3 	(CLK_100MHZ), 			// Generate 100MHz clock to use on system signals
 
 		// Status and control signals
 		.reset 		(1'b0),					// active-high reset for the clock generator
-		.locked 	(	  ));				// set high when output clocks have correct frequency & phase
+		.locked 	(clk_locked));			// set high when output clocks have correct frequency & phase
 
 	/******************************************************************/
 	/* debounce instantiation						                  */
@@ -158,7 +173,7 @@ module nexys4fpga (
 
 		// connections with Nexys4
 
-		.clk 		(clk),	
+		.clk 		(CLK_100MHZ),	
 		.pbtn_in	({btnC,btnL,btnU,btnR,btnD,btnCpuReset}),
 		.switch_in	(sw));
 	
@@ -179,7 +194,7 @@ module nexys4fpga (
 
 		.seg (segs_int),			
 		.an (an),
-		.clk (clk), 
+		.clk (CLK_100MHZ), 
 		.reset (sysreset),
 		.digits_out (digits_out));	
 
@@ -189,7 +204,9 @@ module nexys4fpga (
 
 	audio_demo AudioGen (
 
-		.clk_i 					(clk),						// I [ 0 ]
+		.clk_i 					(CLK_100MHZ),				// I [ 0 ]
+		.clk_6_144MHz 			(CLK_6MHZ),					// I [ 0 ]
+		.clk_locked				(clk_locked),				// I [ 0 ] 
 		.rst_i					(1'b0),						// I [ 0 ]  active-high reset for audio_demo
 
 		// PDM interface with the MIC
@@ -212,7 +229,7 @@ module nexys4fpga (
 		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the state machine
 		.btnL 					(db_btns[4]),
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
-		.ckaTime 				(clk),						// I [ 0 ]
+		.ckaTime 				(CLK_100MHZ),				// I [ 0 ]
 		.enaTime 				(flgTimeFrameActive),		// O [ 0 ]
 		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] output from audio_demo and FftBlock
 		.addraTime 				(addraTime),				// O [9:0]
@@ -226,14 +243,29 @@ module nexys4fpga (
 	/* VGA_Controller instantiation            					  	  */
 	/******************************************************************/
 
-	VgaCtrl VGA_Controller (
+/*	VgaCtrl VGA_Controller (
 
 		.ckVideo 				(CLK_25MHZ),				// I [ 0 ]
+//		.reset 					(sysreset),					// I [ 0 ]
 		.adrHor					(adrHor),					// O [9:0]
 		.adrVer					(adrVer),					// O [9:0]
 		.flgActiveVideo 		(flgActiveVideo),			// O [ 0 ]
-		.HS 					(Hsync),					// O [ 0 ]
-		.VS 					(Vsync));					// O [ 0 ]
+		.HS 					(vga_hsync),				// O [ 0 ]
+		.VS 					(vga_vsync));				// O [ 0 ]*/
+
+	/******************************************************************/
+	/* DTG instantiation      			      					  	  */
+	/******************************************************************/
+
+ 	dtg DTG (
+
+ 		.clock 			(CLK_25MHZ),		// I [ 0 ]
+ 		.rst 			(sysreset),			// I [ 0 ]
+ 		.horiz_sync 	(vga_hsync),		// O [ 0 ]
+ 		.vert_sync		(vga_vsync),		// O [ 0 ]
+ 		.video_on 		(flgActiveVideo),	// O [ 0 ]
+ 		.pixel_row 		(adrVer),			// O [9:0]
+ 		.pixel_column 	(adrHor));			// O [9:0]
 
 	/******************************************************************/
 	/* Image_Controller instantiation          					  	  */
@@ -241,7 +273,7 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.ck100MHz 				(clk), 						// I [ 0 ]
+		.ck100MHz 				(CLK_100MHZ), 				// I [ 0 ]
 
 		// Time-domain signals
 
@@ -263,8 +295,8 @@ module nexys4fpga (
 		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ]
 		.adrHor					(adrHor),					// I [9:0]
 		.adrVer					(adrVer),					// I [9:0]
-		.red 					(vgaRed),					// O [3:0]
-		.green 					(vgaGreen),					// O [3:0]
-		.blue 					(vgaBlue));					// O [3:0]
+		.red 					(vga_red),					// O [3:0]
+		.green 					(vga_green),				// O [3:0]
+		.blue 					(vga_blue));				// O [3:0]
 
 endmodule
