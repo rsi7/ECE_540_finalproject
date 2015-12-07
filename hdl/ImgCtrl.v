@@ -24,12 +24,14 @@ module ImgCtrl (
 	input   [9:0]   	addraFreq,
 	input   [7:0]   	dinaFreq,
 
-	// video signals
+	// video timing signals
 
 	input           	ckVideo,
 	input           	flgActiveVideo,
 	input   [9:0]  		adrHor,
 	input   [9:0]  		adrVer,
+
+	// pixel RGB values
 
 	output reg	[3:0]   red,
 	output reg	[3:0]   green,
@@ -39,32 +41,30 @@ module ImgCtrl (
 	/* Local parameters and variables                                 */
 	/******************************************************************/
 
-	localparam      	cstHorSize = 800;
-	localparam      	cstHorAl = 640;     // # of pixels: active line
-	localparam      	cstHorFp = 16;      // # of pixels: front porch
-	localparam      	cstHorPw = 96;      // # of pixels: pulse with
-	localparam      	cstHorBp = 48;      // # of pixels: back porch
+	localparam      	HorSize = 800;
+	localparam      	HorAl 	= 640;     		// # of pixels: active line
 
-	localparam      	cstVerSize = 521;
-	localparam      	cstVerAf = 480;     // # of lines: active frame
-	localparam      	cstVerFp = 11;      // # of lines: front porch
-	localparam      	cstVerPw = 2;       // # of lines: pulse with
-	localparam      	cstVerBp = 31;      // # of lines: back porch
 
-	wire  [7:0]   	sampleDisplayTime;      // time domain sample for display
-	wire  [7:0]   	sampleDisplayFreq;      // freq domain sample for display
+	localparam      	VerSize = 521;
+	localparam      	VerAf 	= 480;     		// # of lines: active frame
+
+
+	wire  [7:0]   		sampleDisplayTime;      // time domain sample for display
+	wire  [7:0]   		sampleDisplayFreq;      // freq domain sample for display
 						
-	// accessing RAM for pixel
+	// accessing RAM for frequency & time graphs
+	// based on pixel x-coordinate value
 
-	wire  [9:0]   memAdrHor;              // pixel column counter
+	wire  [9:0]   		memAdrHor;              // pixel column (x-coordinate)
 
 	// connections for output VGA ports
 
-	reg  [3:0]   intRed;
-	reg  [3:0]   intGreen;
-	reg  [3:0]   intBlue;
+	reg  [3:0]   		intRed;
+	reg  [3:0]   		intGreen;
+	reg  [3:0]   		intBlue;
 
-	// internal signals
+	// internal signals for calculations
+	// time data is signed (-128 : 128) and needs to be converted
 
 	wire 		[7:0]  FreqHeight;
 	wire signed [7:0]  TimeHeight;
@@ -79,10 +79,13 @@ module ImgCtrl (
 	/******************************************************************/
 	/* intRed block					                                  */
 	/******************************************************************/
- 
+ 	
+ 	// put time waveform in display's top-half && adjust the bar height
+
  	always@(posedge ckVideo) begin
-		if ((adrVer <= 10'd240) && (adrVer >= TimeHeight))
+		if ((adrVer <= 10'd240) && (adrVer >= TimeHeight)) begin
 			intRed <= 4'b1111;
+		end
 		else begin
 			intRed <= 4'b0000;
 		end
@@ -91,6 +94,8 @@ module ImgCtrl (
 	/******************************************************************/
 	/* intGreen block				                                  */
 	/******************************************************************/
+
+	// put frequency bars in display's bottom-half && adjust the bin height
 
 	always@(posedge ckVideo) begin
 		if ((adrVer >= 10'd240) && (adrVer >= (10'd470 - FreqHeight))) begin
@@ -105,6 +110,8 @@ module ImgCtrl (
 	/* intBlue block				                                  */
 	/******************************************************************/
 
+	// no need for blue values
+
 	always@(posedge ckVideo) begin
 		intBlue = 4'b0000;
 	end
@@ -112,6 +119,9 @@ module ImgCtrl (
   /******************************************************************/
   /* Outputting pixel RGB values                                    */
   /******************************************************************/
+
+  // if pixel location is in active part of 512x480 display, send RGB data
+  // otherwise, draw black background
 
 	always@(posedge ckVideo) begin
 			
