@@ -16,13 +16,13 @@ module FftBlock (
   input               btnL,
   input       [2:0]   sw,
   input               ckaTime,
-  output              enaTime,
-  output              weaTime,
-  output      [9:0]   addraTime,
+  output reg          enaTime,
+  output 	          weaTime,
+  output reg  [9:0]   addraTime,
   input 	  [7:0]   dinaTime,
   input               ckFreq,
-  output              flgFreqSampleValid,
-  output      [9:0]   addrFreq,
+  output reg          flgFreqSampleValid,
+  output reg  [9:0]   addrFreq,
   output reg  [7:0]   byteFreqSample);
 
   /******************************************************************/
@@ -34,6 +34,7 @@ module FftBlock (
   wire            intEnaTime;
   wire            intWeaTime;
   reg    [10:0]   intAddraTime;
+  wire 			  intflgFreqSampleValid;
 
   // xfft_1 signals
 
@@ -82,20 +83,26 @@ module FftBlock (
   reg             cenLoadCounter;		  	// count enable for Load counter
   reg             cenUnloadCounter;			// count enable for Unload counter
 
-  // 18x18 bit multiplication for signal power
+  // 18x18 bit multiplication then sum for signal power
 
-  wire    [35:0]  m_axis_data_tpower;     // 18x18 bit multiplication
+  wire 	[36:0]  m_axis_data_tpower;     // 18x18 bit multiplication
 
   // signals for signed comparison
 
   wire signed [7:0] oldDinaTime_signed;
   wire signed [7:0] dinaTime_signed;
 
+  wire signed [17:0] real_data_signed;
+  wire signed [35:0] real_data_squared;
+
+  wire signed [17:0] imaginary_data_signed;
+  wire signed [35:0] imaginary_data_squared;
+
   /******************************************************************/
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  assign enaTime = intEnaTime;
+  // assign enaTime = intEnaTime;
   assign weaTime = intWeaTime;
 
   assign s_axis_config_tvalid = 1'b1;
@@ -103,13 +110,19 @@ module FftBlock (
   assign s_axis_data_tlast = !(flgCountLoad);		// not active while counting
   assign m_axis_data_tready = 1'b1;
 
-  assign addraTime = intAddraTime[9:0];
+  // assign addraTime = intAddraTime[9:0];
   assign intEnaTime = !(intAddraTime[10]);			// active while counting
-  assign addrFreq = cntFftUnloadFreq;
+  // assign addrFreq = cntFftUnloadFreq;
 
   assign s_axis_data_tdata = {8'b00000000, s_axis_data_tbyte};
-  assign m_axis_data_tpower = (m_axis_data_tdata[18:1] * m_axis_data_tdata[18:1]) + (m_axis_data_tdata[42:25] * m_axis_data_tdata[42:25]);
-  // assign byteFreqSample = m_axis_data_tpower[23:16];
+
+  assign real_data_signed = m_axis_data_tdata[18:1];
+  assign real_data_squared = (real_data_signed) * (real_data_signed);
+
+  assign imaginary_data_signed = m_axis_data_tdata[42:25];
+  assign imaginary_data_squared = (imaginary_data_signed) * (imaginary_data_signed);
+
+  assign m_axis_data_tpower = (real_data_squared) + (imaginary_data_squared);
 
   assign dinaTime_signed = dinaTime;
   assign oldDinaTime_signed = oldDinaTime;
@@ -249,6 +262,13 @@ module FftBlock (
   // Choose power (height of FFT bars) thru switches [2:0] on Nexys4 board
   
   always@(posedge ckaTime) begin
+
+	enaTime <= intEnaTime;
+	// weaTime <= intWeaTime;
+	addraTime <= intAddraTime[9:0];
+	flgFreqSampleValid <= intflgFreqSampleValid;
+	addrFreq <= cntFftUnloadFreq;
+
     case (sw[2:0])
       3'b000 : byteFreqSample <= m_axis_data_tpower[30:23];
       3'b001 : byteFreqSample <= m_axis_data_tpower[29:22];
@@ -278,7 +298,7 @@ module FftBlock (
     .s_axis_data_tready             (s_axis_data_tready),               // O [ 0 ]
     .s_axis_data_tlast              (s_axis_data_tlast),                // I [ 0 ]
     .m_axis_data_tdata              (m_axis_data_tdata),                // O [47:0]
-    .m_axis_data_tvalid             (flgFreqSampleValid),               // O [ 0 ]
+    .m_axis_data_tvalid             (intflgFreqSampleValid),            // O [ 0 ]
     .m_axis_data_tready             (m_axis_data_tready),               // I [ 0 ]
     .m_axis_data_tlast              (m_axis_data_tlast),                // O [ 0 ]
     .event_frame_started            (event_frame_started),              // O [ 0 ]
