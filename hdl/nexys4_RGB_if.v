@@ -15,48 +15,54 @@ module nexys_RGB_if #(
 	/* Parameter declarations						                  */
 	/******************************************************************/
 
-	parameter	PA_PBTNS 			=	8'h00,		// (i) pushbuttons inputs
-	parameter	PA_SLSWTCH			=	8'h01,		// (i) slide switches
-	parameter	PA_LEDS				=	8'h02,		// (o) LEDs
-	parameter	PA_DIG3				=	8'h03,		// (o) digit 3 port address
-	parameter	PA_DIG2				=	8'h04,		// (o) digit 2 port address
-	parameter	PA_DIG1    			=	8'h05,		// (o) digit 1 port address
-	parameter	PA_DIG0    			=	8'h06,		// (o) digit 0 port address
-	parameter	PA_DP    			=	8'h07,		// (o) decimal points 3:0 port address
-	parameter	PA_RSVD    			=	8'h08,		// (o) *RESERVED* port address
+	// Pushbutton
+
+	parameter	PA_PBTNS 			= 8'h00, // (i) slide switches
+
+	// Sevensegement display digits
+
+	parameter 	PA_DIG7 			= 8'h01,
+	parameter 	PA_DIG6 			= 8'h02,
+	parameter 	PA_DIG5 			= 8'h03,
+	parameter 	PA_DIG4 			= 8'h04,
+	parameter 	PA_DIG3 			= 8'h05,
+	parameter 	PA_DIG2 			= 8'h06,
+	parameter 	PA_DIG1 			= 8'h07,
+	parameter 	PA_DIG0 			= 8'h08,
 
 	// FFT interface registers
 	
-	parameter	PA_FFT_RED    		=	8'h0A,		// (i) X coordinate of rojobot location
-	parameter	PA_FFT_GREEN    	=	8'h0B,		// (i) Y coordinate of rojobot location
-	parameter	PA_FFT_BLUE    		=	8'h0C,		// (i) Rojobot info register
+	parameter	PA_PicoblazeRed    		=	8'h0A,		
+	parameter	PA_PicoblazeGreen    	=	8'h0B,		
+	parameter	PA_PicoblazeBlue    	=	8'h0C)		
 	
-	// Extended I/O interface port addresses for the Nexys4.  Your Nexys4_Bot interface module
-	// should include these additional ports even though they are not used in this program
-
-	parameter	PA_PBTNS_ALT    	=	8'h10,		// (i) pushbutton inputs alternate port address
-	parameter	PA_SLSWTCH1508  	=	8'h11,		// (i) slide switches 15:8 (high byte of switches
-	parameter	PA_LEDS1508    		=	8'h12,		// (o) LEDs 15:8 (high byte of switches)
-	parameter	PA_DIG7    			=	8'h13,		// (o) digit 7 port address
-	parameter	PA_DIG6    			=	8'h14,		// (o) digit 6 port  address
-	parameter	PA_DIG5    			=	8'h15,		// (o) digit 5 port address
-	parameter	PA_DIG4    			=	8'h16,		// (o) digit 4 port address
-	parameter	PA_DP0704    		=	8'h17,		// (o) decimal points 7:4 port address
-	parameter	PA_RSVD_ALT    		=	8'h18)		// (o) *RESERVED* alternate port address
-
 	/******************************************************************/
 	/* Port declarations							                  */
 	/******************************************************************/
 
 	(
 	
-	// interface registers from imgctrl.v
-	
-	output	reg	[7:0]	fft_red,
-	output	reg	[7:0]	fft_green,
-	output	reg	[7:0]	fft_blue,
+	// Global signals from Nexys4
 
-	//system interface with kcpsm6.v
+	input 				clk, 				// sysclock signal from Nexys4
+	input 				reset,				// sysreset signal from Nexys4
+
+	// Debounced pushbuttons
+	
+	input 	[5:0]		db_btns,			// debounce pushbutton input in from kcpsm6.v
+	
+	// Interface with sevensegment
+	
+	output	reg [4:0]	dig7,dig6,			// output for sevensegement display
+						dig5,dig4,
+						dig3,dig2,
+						dig1,dig0,
+
+	// RGB values for ImgCtrl
+	
+	output	reg	[11:0]	PicoblazeRGB,
+
+	// Interface with KCPSM6
 
 	input 		[7:0]	port_id,			// address of port id
 						out_port,			// output from kcpm6.v and input for interface
@@ -65,32 +71,7 @@ module nexys_RGB_if #(
 						write_strobe,		// input from kcpsm6.v and output for interface
 						read_strobe,		// input from kcpsm6.v and output for interface
 						interrupt_ack,		// input from kcpsm6.v and output for interface
-	output	reg			interrupt,			// input from kcpsm6.v and output for interface
-							
-	//sytem interface with debounce.v
-	
-	input 	[5:0]		db_btns,			// debounce pushbutton input in from kcpsm6.v
-	input	[15:0]		db_sw,				// debounce slide switch input from kcpsm6.v
-	
-	//system interface with sevensegement.v
-	
-	output	reg [4:0]	dig7,dig6,			// output for sevensegement display
-						dig5,dig4,
-						dig3,dig2,
-						dig1,dig0,
-
-	output	reg [7:0]	dp,					// decimal output for sevensegement
-	output	reg [15:0]	led,				// output for green LEDs
-	
-	//system interface with Nexys4
-
-	input 	clk, 							// sysclock signal from Nexys4
-	input 	reset,							// sysreset signal from Nexys4
-
-	// signals for 1Hz flag generator
-	
-	integer clk_cnt_1Hz,
-	reg 	flag_1Hz);
+	output	reg			interrupt);			// input from kcpsm6.v and output for interface	
 
 	/******************************************************************/
 	/* Decoding pushbutton inputs from debounced signals           	  */
@@ -101,6 +82,13 @@ module nexys_RGB_if #(
 	wire 	btnUp 		= db_btns[3];
 	wire 	btnRight 	= db_btns[2];
 	wire 	btnDown 	= db_btns[1];
+
+	reg 	[3:0]		PicoblazeRed;
+	reg 	[3:0]		PicoblazeGreen;
+	reg 	[3:0]		PicoblazeBlue;
+
+	integer clk_cnt_2Hz;
+	reg 	flag_2Hz;
 
 	/******************************************************************/
 	/* Servicing the KCPSM6 "READ" command		                  	  */
@@ -120,7 +108,6 @@ module nexys_RGB_if #(
 			
 			case (port_id)
 				PA_PBTNS: in_port <= {3'b000, btnCenter, btnLeft, btnUp, btnRight, btnDown};
-				PA_SLSWTCH: in_port <= db_sw[7:0];			
 			endcase
 		end
 	end
@@ -131,14 +118,9 @@ module nexys_RGB_if #(
 
 	always@(posedge clk) begin
 
-		//  apply reset --> clear output signals going to LEDs, sevensegment, and motor
+		//  apply reset --> clear output signals
 
 		if (reset) begin		
-			dp 			<= 8'd0;
-			led  		<= 16'd0;
-			fft_red 	<= 8'd0;
-			fft_blue 	<= 8'd0;
-			fft_green 	<= 8'd0;
 			dig7 		<= 5'd0;
 			dig6 		<= 5'd0;
 			dig5 		<= 5'd0;
@@ -147,6 +129,9 @@ module nexys_RGB_if #(
 			dig2 		<= 5'd0; 
 			dig1 		<= 5'd0; 
 			dig0 		<= 5'd0;
+			PicoblazeRed 	<= 8'd0;
+			PicoblazeBlue 	<= 8'd0;
+			PicoblazeGreen 	<= 8'd0;
 		end
 		
 		// check for "write_strobe" signals from KCPSM6
@@ -155,11 +140,7 @@ module nexys_RGB_if #(
 		else if (write_strobe || k_write_strobe) begin
 				
 			case (port_id)
-				PA_DP : dp <= out_port;
-				PA_LEDS : led [7:0] <= out_port;
-				PA_FFT_RED : fft_red <= out_port;
-				PA_FFT_GREEN : fft_green <= out_port;
-				PA_FFT_BLUE : fft_blue <= out_port; 
+
 				PA_DIG7: dig7 <= out_port[4:0];
 				PA_DIG6: dig6 <= out_port[4:0];
 				PA_DIG5: dig5 <= out_port[4:0];
@@ -167,7 +148,11 @@ module nexys_RGB_if #(
 				PA_DIG3: dig3 <= out_port[4:0];			
 				PA_DIG2: dig2 <= out_port[4:0];				
 				PA_DIG1: dig1 <= out_port[4:0];				
-				PA_DIG0: dig0 <= out_port[4:0];				
+				PA_DIG0: dig0 <= out_port[4:0];		
+				PA_PicoblazeRed : PicoblazeRed <= out_port;
+				PA_PicoblazeGreen : PicoblazeGreen <= out_port;
+				PA_PicoblazeBlue : PicoblazeBlue <= out_port; 
+
 			endcase
 		end
 	end
@@ -191,10 +176,10 @@ module nexys_RGB_if #(
 			interrupt <= 1'b0;
 		end
 
-		// check for 1_Hz flag
+		// check for 2_Hz flag
 		// if active, set interrupt flag for KCPSM6
 
-		else if (flag_1Hz) begin
+		else if (flag_2Hz) begin
 			interrupt <= 1'b1;	
 		end
 
@@ -213,17 +198,25 @@ module nexys_RGB_if #(
 
 	always @(posedge clk) begin
 		if (reset) begin
-			flag_1Hz <= 1'b0;
-			clk_cnt_1Hz <= 0;
+			flag_2Hz <= 1'b0;
+			clk_cnt_2Hz <= 0;
 		end
-		else if (clk_cnt_1Hz == 200000) begin
-			flag_1Hz <= 1'b1;
-			clk_cnt_1Hz <= 0;
+		else if (clk_cnt_2Hz == 50000000) begin
+			flag_2Hz <= 1'b1;
+			clk_cnt_2Hz <= 0;
 		end
 		else begin
-			flag_1Hz <= 1'b0;
-			clk_cnt_1Hz <= clk_cnt_1Hz + 1'b1;
+			flag_2Hz <= 1'b0;
+			clk_cnt_2Hz <= clk_cnt_2Hz + 1'b1;
 		end
+	end
+
+	/******************************************************************/
+	/* Outputting the 12-bit RGB values			                  	  */
+	/******************************************************************/
+
+	always@(posedge clk) begin
+		PicoblazeRGB <= {PicoblazeRed, PicoblazeGreen, PicoblazeBlue};
 	end
 
 endmodule

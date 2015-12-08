@@ -33,9 +33,11 @@ module ImgCtrl (
 
 	// pixel RGB values
 
-	output reg	[3:0]   red,
-	output reg	[3:0]   green,
-	output reg	[3:0]  	blue);
+	output reg	[11:0]  OutputRGB,
+
+	// RGB values from Picoblaze
+
+	input 		[11:0]	PicoblazeRGB);
 
 	/******************************************************************/
 	/* Local parameters and variables                                 */
@@ -57,17 +59,17 @@ module ImgCtrl (
 
 	wire  [9:0]   		memAdrHor;              // pixel column (x-coordinate)
 
-	// connections for output VGA ports
+	// internal register to store RGB values before displaying
 
-	reg  [3:0]   		intRed;
-	reg  [3:0]   		intGreen;
-	reg  [3:0]   		intBlue;
+	reg  [11:0] 		intRGB;
 
 	// internal signals for calculations
 	// time data is signed (-128 : 128) and needs to be converted
+	// frequency data is unsigned (power reading) and needs a 1'b0 prefix
 
 	wire 		[7:0]  FreqHeight;
 	wire signed [7:0]  TimeHeight;
+
 	wire signed [7:0]  sampleDisplayTime_signed;
 
 	assign memAdrHor = (adrHor == 10'd799) ? (10'd0) : (adrHor + 1);
@@ -77,43 +79,28 @@ module ImgCtrl (
 	assign TimeHeight = 10'sd120 - sampleDisplayTime_signed;
 
 	/******************************************************************/
-	/* intRed block					                                  */
-	/******************************************************************/
- 	
- 	// put time waveform in display's top-half && adjust the bar height
-
- 	always@(posedge ckVideo) begin
-		if ((adrVer <= 10'd240) && (adrVer >= TimeHeight)) begin
-			intRed <= 4'b1111;
-		end
-		else begin
-			intRed <= 4'b0000;
-		end
-	end
-
-	/******************************************************************/
-	/* intGreen block				                                  */
+	/* Frequency Bars + Time Waveform Display block	                  */
 	/******************************************************************/
 
-	// put frequency bars in display's bottom-half && adjust the bin height
+		// put frequency bars in display's bottom-half && adjust the bin height
 
 	always@(posedge ckVideo) begin
+	
 		if ((adrVer >= 10'd240) && (adrVer >= (10'd470 - FreqHeight))) begin
-			intGreen <= 4'b1111;
+			intRGB <= PicoblazeRGB;
 		end
+
+ 		// put time waveform in display's top-half && adjust the bar height
+
+		else if ((adrVer <= 10'd240) && (adrVer >= TimeHeight)) begin
+			intRGB <= ~PicoblazeRGB;
+		end
+
+		// otherwise, output black pixel
+
 		else begin
-			intGreen <= 4'b0000;
+			intRGB <= 12'h000;
 		end
-	end
-
-	/******************************************************************/
-	/* intBlue block				                                  */
-	/******************************************************************/
-
-	// no need for blue values
-
-	always@(posedge ckVideo) begin
-		intBlue = 4'b0000;
 	end
 
   /******************************************************************/
@@ -126,15 +113,11 @@ module ImgCtrl (
 	always@(posedge ckVideo) begin
 			
 		if (flgActiveVideo == 1) begin
-			red 	<= intRed;
-			green 	<= intGreen;
-			blue 	<= intBlue;
+			OutputRGB <= intRGB;
 		end
 
 		else begin
-			red 	<= 4'b0000;
-			green 	<= 4'b0000;		
-			blue 	<= 4'b0000; 	
+			OutputRGB <= 12'h000; 	
 		end
 	end
 				

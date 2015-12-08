@@ -87,10 +87,6 @@ module nexys4fpga (
 	wire				interrupt;
 	wire				interrupt_ack;
 
-	reg 	[7:0]		fft_red;
-	reg 	[7:0]		fft_green;
-	reg 	[7:0]		fft_blue;
-
 	// Connections between debounce <--> PicoBlaze
 
 	wire 	[15:0]		db_sw;						// debounced switches
@@ -107,7 +103,7 @@ module nexys4fpga (
 	wire    [7:0]       segs_int;               	// segments and the decimal point
 	wire 	[63:0]		digits_out;					// ASCII digits (only for simulation)
 
-	// Connections for FFT
+	// Connections between audio_demo <--> FFT
 
 	wire	[15:0]		wordTimeSample;				// data_mic (audio_demo) --> dina (Time buffer)
 	wire 				flgTimeSampleValid;			// data_mic_valid (audio_demo) --> wea (Time buffer)
@@ -123,10 +119,18 @@ module nexys4fpga (
 	wire 	[9:0]		adrHor;
 	wire	[9:0]		adrVer;
 
-	// Connections for 10Hz flag generator block
+	// Internal signals for 10Hz flag generator block
 
 	reg 				flgStartAcquisition;		// 10Hz flag
 	integer 			cntPresc;					// counter from 0 - 2,499,999
+
+	// RGB wire between RGBInterface <--> ImgCtrl
+
+	wire 	[11:0]		PicoblazeRGB;
+
+	// RGB output ImgCtrl; gets split and sent to VGA monitor
+
+	wire 	[11:0] 		OutputRGB;
 
 	// debugging
 
@@ -143,15 +147,21 @@ module nexys4fpga (
 
 	assign 	led = led_reg;
 
+	assign 	vga_red = {OutputRGB[11:8]};
+	assign 	vga_green = {OutputRGB[7:4]};
+	assign 	vga_blue = {OutputRGB[3:0]};
+
 	/******************************************************************/
 	/* 10Hz flag generator block					                  */
 	/******************************************************************/
 
 	always@(posedge CLK_25MHZ) begin
+
 		if (cntPresc == (cstDivPresc-1)) begin
 			cntPresc <= 1'b0;
 			flgStartAcquisition <= 1'b1;
 		end
+
 		else begin
 			cntPresc <= cntPresc + 1'b1;
 			flgStartAcquisition <= 1'b0;
@@ -159,10 +169,13 @@ module nexys4fpga (
 	end
 
 	always@(posedge CLK_25MHZ) begin
+
 		if (flgStartAcquisition) begin
 			led_reg <= byteFreqSample;
 		end
+
 	end
+
 	/******************************************************************/
 	/* ClockWiz instantiation		           	                      */
 	/******************************************************************/
@@ -187,7 +200,7 @@ module nexys4fpga (
 
 	debounce DB (
 
-		// connections with PicoBlaze
+		// connections with Picoblaze
 
 		.pbtn_db	(db_btns),
 		.swtch_db	(db_sw),
@@ -205,7 +218,7 @@ module nexys4fpga (
 
 	sevensegment SSB (
 		
-		// connections with PicoBlaze
+		// connections with Picoblaze
 
 		.d0(dig0), .d1(dig1), .d2(dig2), .d3(dig3),
 		.d4(dig4), .d5(dig5), .d6(dig6), .d7(dig7),
@@ -302,111 +315,110 @@ module nexys4fpga (
 		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ]
 		.adrHor					(adrHor),					// I [9:0]
 		.adrVer					(adrVer),					// I [9:0]
-		.red 					(vga_red),					// O [3:0]
-		.green 					(vga_green),				// O [3:0]
-		.blue 					(vga_blue));				// O [3:0]
 
+		// RGB output from ImgCtrl
 
-	// /******************************************************************/
-	// /* RGBInterface instantiation		                              */
-	// /******************************************************************/
+		.OutputRGB 				(OutputRGB),				// O [11:0]
 
-	// nexys_RGB_if RGBInterface (
-	
-	// 	// connections with RGB register
+		// RGB input from Picoblaze
 
-	// 	.fft_red			(fft_red),				// O [7:0]
-	// 	.fft_green			(fft_green),			// O [7:0]
-	// 	.fft_blue			(fft_blue),				// O [7:0]
+		.PicoblazeRGB			(PicoblazeRGB));			// I [11:0]
 
-	// 	// connections with KCPSM6
+	/******************************************************************/
+	/* RGBInterface instantiation		                              */
+	/******************************************************************/
 
-	// 	.port_id 			(port_id),				// I [7:0] address of port id
-	// 	.out_port 			(out_port),				// I [7:0] output from KCPSM6 --> input to interface
-	// 	.in_port 			(in_port),				// O [7:0] output from inteface --> input to KCPSM6
-	// 	.k_write_strobe 	(k_write_strobe),		// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
-	// 	.write_strobe 		(write_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
-	// 	.read_strobe 		(read_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'INPUT'
-	// 	.interrupt 			(interrupt),			// O [ 0 ] driven high --> force KCPSM to perform interrupt
-	// 	.interrupt_ack		(interrupt_ack),		// I [ 0 ] pulses high for one cycle when KCPSM6 calls interrupt vector
-	
-	// 	// connections with debounce
+	nexys_RGB_if RGBInterface (
 
-	// 	.db_btns 	(db_btns),						// I [5:0] debounced pushbutton inputs
-	// 	.db_sw 		(db_sw),						// I [15:0] debounced slide switch inputs
+		// connections with Nexys4 board
 
-	// 	// connections with sevensegment
+		.clk 				(CLK_100MHZ),			// I [ 0 ] system clock input from Nexys4 board
+		.reset 				(sysreset),				// I [ 0 ] system reset signal from Nexys4 board
 
-	// 	.dig7 	(dig7),			// O [4:0] digit #7 signal for sevensegment
-	// 	.dig6 	(dig6),			// O [4:0] digit #6 signal for sevensegment
-	// 	.dig5 	(dig5),			// O [4:0] digit #5 signal for sevensegment
-	// 	.dig4 	(dig4),			// O [4:0] digit #4 signal for sevensegment
-	// 	.dig3 	(dig3),			// O [4:0] digit #3 signal for sevensegment
-	// 	.dig2 	(dig2),			// O [4:0] digit #2 signal for sevensegment
-	// 	.dig1 	(dig1),			// O [4:0] digit #1 signal for sevensegment
-	// 	.dig0 	(dig0),			// O [4:0] digit #0 signal for sevensegment
-	// 	.dp 	(decpts),		// O [7:0] decimal point signal for sevensegment
-	
-	// 	// connections with Nexys4 board
+		// connections with debounce
 
-	// 	.led 	(led),			// O [15:0] signals for writing Nexys4 LEDs
-	// 	.clk 	(CLK_100MHZ),	// I [ 0 ] system clock input from Nexys4 board
-	// 	.reset 	(sysreset));	// I [ 0 ] system reset signal from Nexys4 board
+		.db_btns 			(db_btns),				// I [5:0] debounced pushbutton inputs
 
-	// /******************************************************************/
-	// /* KCPSM6  instantiation		                              	  */
-	// ****************************************************************
+		// connections with sevensegment
 
-	// kcpsm6 #(
-	// 	.interrupt_vector			(12'h3FF),
-	// 	.scratch_pad_memory_size	(64),
-	// 	.hwbuild					(8'h00))
+		.dig7 	(dig7),			// O [4:0] digit #7 signal for sevensegment
+		.dig6 	(dig6),			// O [4:0] digit #6 signal for sevensegment
+		.dig5 	(dig5),			// O [4:0] digit #5 signal for sevensegment
+		.dig4 	(dig4),			// O [4:0] digit #4 signal for sevensegment
+		.dig3 	(dig3),			// O [4:0] digit #3 signal for sevensegment
+		.dig2 	(dig2),			// O [4:0] digit #2 signal for sevensegment
+		.dig1 	(dig1),			// O [4:0] digit #1 signal for sevensegment
+		.dig0 	(dig0),			// O [4:0] digit #0 signal for sevensegment
 
-	// KCPSM6 (
+		// connections with ImgCtrl
 
-	// 	// connections with FinalProject
+		.PicoblazeRGB			(PicoblazeRGB),			// O [11:0]
 
-	// 	.address 			(address),				// O [11:0] program address going to Proj2Demo
-	// 	.instruction 		(instruction),			// I [17:0] instructions from Proj2Demo
-	// 	.bram_enable 		(bram_enable),			// O [ 0 ] read enable for program memory
-	// 	.reset 				(sysreset),				// I [ 0 ] driven high --> resets processor
+		// connections with KCPSM6
 
-	// 	// connections with nexys_RGB_if
+		.port_id 			(port_id),				// I [7:0] address of port id
+		.out_port 			(out_port),				// I [7:0] output from KCPSM6 --> input to interface
+		.in_port 			(in_port),				// O [7:0] output from inteface --> input to KCPSM6
+		.k_write_strobe 	(k_write_strobe),		// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
+		.write_strobe 		(write_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
+		.read_strobe 		(read_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'INPUT'
+		.interrupt 			(interrupt),			// O [ 0 ] driven high --> force KCPSM to perform interrupt
+		.interrupt_ack		(interrupt_ack));		// I [ 0 ] pulses high for one cycle when KCPSM6 calls interrupt vector
 
-	// 	.port_id 			(port_id),				// O [7:0] defines which port KCPSM6 should read/write
-	// 	.write_strobe 		(write_strobe),			// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
-	// 	.k_write_strobe 	(k_write_strobe),		// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
-	// 	.out_port 			(out_port),				// O [7:0] output data from KCPSM6 --> peripheral
-	// 	.read_strobe 		(read_strobe),			// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'READ'
-	// 	.in_port 			(in_port),				// I [7:0] input data from peripheral --> KCPSM6
-	// 	.interrupt 			(interrupt),			// I [ 0 ] driven high --> generates interrupt for KCPSM6
-	// 	.interrupt_ack 		(interrupt_ack),		// O [ 0 ] pulses high for one cycle when KCPSM6 calls interrupt vector
+	/******************************************************************/
+	/* KCPSM6  instantiation		                              	  */
+	/******************************************************************/
 
-	// 	// connections with Nexys4 board
+	kcpsm6 #(
+		.interrupt_vector			(12'h3FF),
+		.scratch_pad_memory_size	(64),
+		.hwbuild					(8'h00))
 
-	// 	.sleep				(1'b0),					// I [ 0 ] tied to 1'b0 to disable input
-	// 	.clk 				(CLK_100MHZ));			// I [ 0 ] system clock from Nexys4 board
+	KCPSM6 (
 
-	// /******************************************************************/
-	// /* PicoblazeMemory instantiation                    			  */
-	// /******************************************************************/	
+		// connections with FinalProject
 
-	// finalproject #(
-	// 	.C_FAMILY		   		("7S"),			// 7-Series device
-	// 	.C_RAM_SIZE_KWORDS		(2),   			// RAM capacity: 2K instructions
-	// 	.C_JTAG_LOADER_ENABLE	(1))     		// set to 1'b1 --> includes JTAG Loader
+		.address 			(address),				// O [11:0] program address going to Proj2Demo
+		.instruction 		(instruction),			// I [17:0] instructions from Proj2Demo
+		.bram_enable 		(bram_enable),			// O [ 0 ] read enable for program memory
+		.reset 				(sysreset),				// I [ 0 ] driven high --> resets processor
 
-	// PicoblazeMemory (
+		// connections with nexys_RGB_if
 
-	// 	// connections with KCPSM6
+		.port_id 			(port_id),				// O [7:0] defines which port KCPSM6 should read/write
+		.write_strobe 		(write_strobe),			// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
+		.k_write_strobe 	(k_write_strobe),		// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
+		.out_port 			(out_port),				// O [7:0] output data from KCPSM6 --> peripheral
+		.read_strobe 		(read_strobe),			// O [ 0 ] pulses high for one cycle when KCPSM6 runs 'READ'
+		.in_port 			(in_port),				// I [7:0] input data from peripheral --> KCPSM6
+		.interrupt 			(interrupt),			// I [ 0 ] driven high --> generates interrupt for KCPSM6
+		.interrupt_ack 		(interrupt_ack),		// O [ 0 ] pulses high for one cycle when KCPSM6 calls interrupt vector
 
-	// 	.rdl 			(		),				// O [ 0 ]  reset during load signal for JTAG Loader
-	// 	.enable 		(bram_enable),			// I [ 0 ]  read-enable for program memory
-	// 	.address 		(address),				// I [11:0] program address coming from KCPSM6
-	// 	.instruction 	(instruction),			// O [17:0] instructions going to KCPSM6
+		// connections with Nexys4 board
 
-	// 	// connections with Nexys4 board
+		.sleep				(1'b0),					// I [ 0 ] tied to 1'b0 to disable input
+		.clk 				(CLK_100MHZ));			// I [ 0 ] system clock from Nexys4 board
 
-	// 	.clk 			(CLK_100MHZ));			// I [ 0 ] system clock from Nexys4 board	
+	/******************************************************************/
+	/* PicoblazeMemory instantiation                    			  */
+	/******************************************************************/	
+
+	finalproject #(
+		.C_FAMILY		   		("7S"),			// 7-Series device
+		.C_RAM_SIZE_KWORDS		(2),   			// RAM capacity: 2K instructions
+		.C_JTAG_LOADER_ENABLE	(1))     		// set to 1'b1 --> includes JTAG Loader
+
+	PicoblazeMemory (
+
+		// connections with KCPSM6
+
+		.rdl 			(		),				// O [ 0 ]  reset during load signal for JTAG Loader
+		.enable 		(bram_enable),			// I [ 0 ]  read-enable for program memory
+		.address 		(address),				// I [11:0] program address coming from KCPSM6
+		.instruction 	(instruction),			// O [17:0] instructions going to KCPSM6
+
+		// connections with Nexys4 board
+
+		.clk 			(CLK_100MHZ));			// I [ 0 ] system clock from Nexys4 board	
 
 endmodule
