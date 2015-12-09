@@ -87,7 +87,8 @@ ADDRESS	000
 				JUMP	main						; Address 003 can be corrupted by Vivado HW manager
 													;
 main:			CALL	init_colors					; initialize red, green, blue values for FFT display
-				
+				ENABLE	INTERRUPT					; get the ball rolling
+
 ; ==================
 ; === Main  Loop ===
 ; ==================
@@ -103,16 +104,16 @@ main_L0:		CALL 	state_machine				; call sub-routine to update state or R/G/B val
 ; === 		init_colors: Initialize RGB values for the FFT 			   ===
 ; ========================================================================	
 
-init_colors:	LOAD	RegCurrColor, SEGMENT_R				; load the current color as 'red'
-				STORE 	RegCurrColor, SP_CURR_STATE 		; store 'red' as current state for FSM
-				LOAD	s0, DEFAULT_RED						; initialize red value as 4'b0000
-				STORE 	s0, SP_RED_VALUE					; store this red value into scratchpad
-				LOAD	RegCurrValue, s0					; load the current value as 4'b0000
-				LOAD	s0, DEFAULT_GREEN					; initialize green value as 4'b1111
-				STORE 	s0, SP_GREEN_VALUE 					; store this green value into scratchpad
-				LOAD	s0, DEFAULT_BLUE					; initialize blue value as 4'b0000
-				STORE 	s0, SP_BLUE_VALUE 					; store this blue value into scratchpad
-				RETURN										; return to main_L0
+init_colors:	LOAD		RegCurrColor, SEGMENT_R				; load the current color as 'red'
+				STORE 		RegCurrColor, SP_CURR_STATE 		; store 'red' as current state for FSM
+				LOAD		s0, DEFAULT_RED						; initialize red value as 4'b0000
+				STORE 		s0, SP_RED_VALUE					; store this red value into scratchpad
+				LOAD		RegCurrValue, s0					; load the current value as 4'b0000
+				LOAD		s0, DEFAULT_GREEN					; initialize green value as 4'b1111
+				STORE 		s0, SP_GREEN_VALUE 					; store this green value into scratchpad
+				LOAD		s0, DEFAULT_BLUE					; initialize blue value as 4'b0000
+				STORE 		s0, SP_BLUE_VALUE 					; store this blue value into scratchpad
+				RETURN											; return to main_L0
 
 ; ================================================================================================================
 ; === 			state_machine: updates state or R/G/B value based on current state & button inputs 			   ===
@@ -230,16 +231,117 @@ write_7segment:		OUTPUT 		RegOnes, PA_DIG0			; write BCD ones value --> digit 0
 ; === 			output_RGB: Outputting RGB to ImgCtrl 				   ===
 ; ========================================================================
 
-output_RGB: 	FETCH 		s0, SP_RED_VALUE				; fetch the current red value into s0
-				AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA red output
-				OUTPUT  	s0, PA_FFT_RED					; write the red value to the FFT
-				FETCH 		s0, SP_GREEN_VALUE 				; fetch the current green value into s0
-				AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA green output
-				OUTPUT 		s0, PA_FFT_GREEN 				; write the green value to the FFT
-				FETCH 		s0, SP_BLUE_VALUE 				; fetch the stored blue value into s0
-				AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA blue output
-				OUTPUT 		s0, PA_FFT_BLUE					; write the blue value to the FFT
-				RETURN 										; return to main_L0
+output_RGB: 		FETCH 		s0, SP_RED_VALUE				; fetch the current red value into s0
+					AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA red output
+					OUTPUT  	s0, PA_FFT_RED					; write the red value to the FFT
+					FETCH 		s0, SP_GREEN_VALUE 				; fetch the current green value into s0
+					AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA green output
+					OUTPUT 		s0, PA_FFT_GREEN 				; write the green value to the FFT
+					FETCH 		s0, SP_BLUE_VALUE 				; fetch the stored blue value into s0
+					AND 		s0, MSK_LOW_4BITS 				; only keep bits [3:0] for VGA blue output
+					OUTPUT 		s0, PA_FFT_BLUE					; write the blue value to the FFT
+					RETURN 										; return to main_L0
+
+; ========================================================
+; === delay_1us() - delays execution for 1 microsecond ===
+; === Registers affected: s0 ===
+; ========================================================
+
+delay_1us: 			LOAD s0, DELAYVAL_1uS 		; Load 1us delay constant
+
+wait_1us: 			SUB s0, 01 					; count down to 0
+					JUMP NZ, wait_1us 			; and then return
+					RETURN
+
+; ===========================================================
+; === delay_40us() - delays execution for 40 microseconds ===
+; === Registers affected: s0, s1 ===
+; ===========================================================
+
+delay_40us: 		LOAD s1, 28 				; 40 x 1us = 40us
+
+wait_40us: 			CALL delay_1us 				; delay 1us
+					SUB s1, 01 					; count down to 0
+					JUMP NZ, wait_40us 			; and then return
+					RETURN
+
+; ========================================================
+; === delay_1 ms() - delays execution for 1 milisecond ===
+; === Registers affected: s0, s1, s2 ===
+; ========================================================
+
+delay_1ms: 			LOAD s2, 19 				; 25 x 40us = 1ms
+
+wait_1ms: 			CALL delay_40us 			; delay 40us
+					SUB s2, 01 					; count down to 0
+					JUMP NZ, wait_1ms 			; and then return
+					RETURN
+
+; ===================================================================
+; === delay_50 ms() - delays execution for 50 miliseconds (20Hz)===
+; === Registers affected: s0, s1, s2, s3 ===
+; ===================================================================
+
+delay_50ms: 		LOAD s3, 32 				; 50 x 1ms = 50ms
+
+wait_50ms: 			CALL delay_1ms 				; delay 1ms
+					SUB s3, 01 					; count down to 0
+					JUMP NZ, wait_50ms 			; and then return
+					RETURN
+
+;*********************************************************************
+; ===================================================================
+; === delay_100 ms() - delays execution for 100 miliseconds (10Hz)===
+; === Registers affected: s0, s1, s2, s3 ===
+; ===================================================================
+
+delay_100ms:		LOAD s3, 64 			; 100 x 1ms = 100ms
+
+wait_100ms: 		CALL delay_1ms 			; delay 1ms
+					SUB s3, 01 				; count down to 0
+					JUMP NZ, wait_100ms 	; and then return
+					RETURN
+
+;*********************************************************************
+; ==================================================================
+; === delay_200 ms() - delays execution for 200 miliseconds (5Hz)===
+; === Registers affected: s0, s1, s2, s3 ===
+; ==================================================================
+
+delay_200ms:		LOAD s3, C8 			; 200 x 1ms = 200ms
+
+wait_200ms: 		CALL delay_1ms 			; delay 1ms
+					SUB s3, 01 				; count down to 0
+					JUMP NZ, wait_200ms 	; and then return
+					RETURN
+
+;*********************************************************************
+; ==================================================================
+; === delay_500 ms() - delays execution for 500 miliseconds (2Hz)===
+; === Registers affected: s0, s1, s2, s3 ===
+; ==================================================================
+
+delay_500ms:		LOAD s4, 05 			; 5 x 100ms = 200ms
+
+wait_500ms: 		CALL delay_100ms 		; delay 100ms
+					SUB s4, 01 				; count down to 0
+					JUMP NZ, wait_500ms 	; and then return
+					RETURN
+
+;*********************************************************************
+; ===============================================================
+; === delay_1000 ms() - delays execution for 1000 miliseconds ===
+; === Registers affected: s0, s1, s2, s3, s4 ===
+; ===============================================================
+
+delay_1000ms: 		LOAD s4, 05 			; 5 x 200ms = 1000ms
+
+wait_1000ms: 		CALL delay_200ms 		; delay 200ms
+					SUB s4, 01 				; count down to 0
+					JUMP NZ, wait_1000ms 	; and then return
+					RETURN
+
+;*******************************************************************
 
 ; =========================
 ; === Interrupt Handler ===
@@ -256,104 +358,3 @@ isr:			INPUT 		RegBtns, PA_PBTNS			; read the pushbuttons
 
 ADDRESS 3FF
 intvect:		JUMP	isr								; jump to interrupt service routine
-
-; ========================================================
-; === delay_1us() - delays execution for 1 microsecond ===
-; === Registers affected: s0 ===
-; ========================================================
-
-delay_1us: 	LOAD s0, DELAYVAL_1uS 		; Load 1us delay constant
-
-wait_1us: 	SUB s0, 01 					; count down to 0
-			JUMP NZ, wait_1us 			; and then return
-			RETURN
-
-; ===========================================================
-; === delay_40us() - delays execution for 40 microseconds ===
-; === Registers affected: s0, s1 ===
-; ===========================================================
-
-delay_40us: LOAD s1, 28 				; 40 x 1us = 40us
-
-wait_40us: 	CALL delay_1us 				; delay 1us
-			SUB s1, 01 					; count down to 0
-			JUMP NZ, wait_40us 			; and then return
-			RETURN
-
-; ========================================================
-; === delay_1 ms() - delays execution for 1 milisecond ===
-; === Registers affected: s0, s1, s2 ===
-; ========================================================
-
-delay_1ms: 	LOAD s2, 19 				; 25 x 40us = 1ms
-
-wait_1ms: 	CALL delay_40us 			; delay 40us
-			SUB s2, 01 					; count down to 0
-			JUMP NZ, wait_1ms 			; and then return
-			RETURN
-
-; ===================================================================
-; === delay_50 ms() - delays execution for 50 miliseconds (20Hz)===
-; === Registers affected: s0, s1, s2, s3 ===
-; ===================================================================
-
-delay_50ms: LOAD s3, 32 				; 50 x 1ms = 50ms
-
-wait_50ms: 	CALL delay_1ms 				; delay 1ms
-			SUB s3, 01 					; count down to 0
-			JUMP NZ, wait_50ms 			; and then return
-			RETURN
-
-;*********************************************************************
-; ===================================================================
-; === delay_100 ms() - delays execution for 100 miliseconds (10Hz)===
-; === Registers affected: s0, s1, s2, s3 ===
-; ===================================================================
-
-delay_100ms:	LOAD s3, 64 			; 100 x 1ms = 100ms
-
-wait_100ms: 	CALL delay_1ms 			; delay 1ms
-				SUB s3, 01 				; count down to 0
-				JUMP NZ, wait_100ms 	; and then return
-				RETURN
-
-;*********************************************************************
-; ==================================================================
-; === delay_200 ms() - delays execution for 200 miliseconds (5Hz)===
-; === Registers affected: s0, s1, s2, s3 ===
-; ==================================================================
-
-delay_200ms:	LOAD s3, C8 			; 200 x 1ms = 200ms
-
-wait_200ms: 	CALL delay_1ms 			; delay 1ms
-				SUB s3, 01 				; count down to 0
-				JUMP NZ, wait_200ms 	; and then return
-				RETURN
-
-;*********************************************************************
-; ==================================================================
-; === delay_500 ms() - delays execution for 500 miliseconds (2Hz)===
-; === Registers affected: s0, s1, s2, s3 ===
-; ==================================================================
-
-delay_500ms:	LOAD s4, 05 			; 5 x 100ms = 200ms
-
-wait_500ms: 	CALL delay_100ms 		; delay 100ms
-				SUB s4, 01 				; count down to 0
-				JUMP NZ, wait_500ms 	; and then return
-				RETURN
-
-;*********************************************************************
-; ===============================================================
-; === delay_1000 ms() - delays execution for 1000 miliseconds ===
-; === Registers affected: s0, s1, s2, s3, s4 ===
-; ===============================================================
-
-delay_1000ms: 	LOAD s4, 05 			; 5 x 200ms = 1000ms
-
-wait_1000ms: 	CALL delay_200ms 		; delay 200ms
-				SUB s4, 01 				; count down to 0
-				JUMP NZ, wait_1000ms 	; and then return
-				RETURN
-
-;*******************************************************************

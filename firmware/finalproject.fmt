@@ -67,6 +67,7 @@
                 JUMP main                          ; Address 003 can be corrupted by Vivado HW manager
                 ;
           main: CALL init_colors                   ; initialize red, green, blue values for FFT display
+                ENABLE INTERRUPT                   ; get the ball rolling
                 ; ==================
                 ; === Main  Loop ===
                 ; ==================
@@ -157,6 +158,7 @@
                 ;        bin2bcd: Binary to Decimal conversion
                 ; ===========================================================================================
        bin2bcd: FETCH s0, SP_CURR_VALUE            ; fetch current value into s0
+                AND s0, MSK_LOW_4BITS              ; keep maximum value as 16
                 LOAD RegOnes, s0                   ; load binary value for BCD conversion
                 LOAD RegHundreds, 00               ; clear the digits
                 LOAD RegTens, 00                   ;
@@ -199,18 +201,6 @@ write_7segment: OUTPUT RegOnes, PA_DIG0            ; write BCD ones value --> di
                 AND s0, MSK_LOW_4BITS              ; only keep bits [3:0] for VGA blue output
                 OUTPUT s0, PA_FFT_BLUE             ; write the blue value to the FFT
                 RETURN                             ; return to main_L0
-                ; =========================
-                ; === Interrupt Handler ===
-                ; =========================
-                ADDRESS 300
-           isr: INPUT RegBtns, PA_PBTNS            ; read the pushbuttons
-                AND RegBtns, MSK_ALLBTNS           ; mask all but db_pbtns[5:0]
-                RETURNI ENABLE                     ; and return from interrupt
-                ; ========================
-                ; === Interrupt vector ===
-                ; ========================
-                ADDRESS 3FF
-       intvect: JUMP isr                           ; jump to interrupt service routine
                 ; ========================================================
                 ; === delay_1us() - delays execution for 1 microsecond ===
                 ; === Registers affected: s0 ===
@@ -287,3 +277,15 @@ write_7segment: OUTPUT RegOnes, PA_DIG0            ; write BCD ones value --> di
                 JUMP NZ, wait_1000ms               ; and then return
                 RETURN 
                 ;*******************************************************************
+                ; =========================
+                ; === Interrupt Handler ===
+                ; =========================
+                ADDRESS 300
+           isr: INPUT RegBtns, PA_PBTNS            ; read the pushbuttons
+                AND RegBtns, MSK_ALLBTNS           ; mask all but db_pbtns[5:0]
+                RETURNI ENABLE                     ; and return from interrupt
+                ; ========================
+                ; === Interrupt vector ===
+                ; ========================
+                ADDRESS 3FF
+       intvect: JUMP isr                           ; jump to interrupt service routine
