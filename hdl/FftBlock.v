@@ -12,34 +12,40 @@ module FftBlock (
   /* Top-level port declarations                                    */
   /******************************************************************/
 
-  input               flgStartAcquisition,
-  input               btnL,
-  input       [2:0]   sw,
-  input               ckaTime,
-  output reg          enaTime,
-  output 	            weaTime,
-  output reg  [9:0]   addraTime,
-  input 	    [7:0]   dinaTime,
-  input               ckFreq,
-  output reg          flgFreqSampleValid,
-  output reg  [9:0]   addrFreq,
-  output reg  [7:0]   byteFreqSample);
+  input               flgStartAcquisition,          // resets the FFT state machine
+  input               btnL,                         // pushbutton to reset FFT state machine
+  input       [2:0]   sw,                           // selecting output data byte (sensitivity)
+  input               ckaTime,                      // 100MHz system clock from ClockWiz
+  input               ckFreq,                       // 25MHz clock from ClockWiz
+
+  // Connections with AudioGen
+
+  output 	            weaTime,                      // sampling frequency a.k.a. time-domain data enable signal (48kHz)
+  input       [7:0]   dinaTime,                     // decoded time-sample data from PDM filter
+  
+  // Connections with ImgCtrl
+
+  output reg          enaTime,                      // port A enable for time buffer: FFT --> ImgCtrl
+  output reg  [9:0]   addraTime,                    // time buffer address: FFT --> ImgCtrl
+  output reg          flgFreqSampleValid,           // write enable for frequency buffer: FFT --> ImgCtrl
+  output reg  [9:0]   addrFreq,                     // frequency buffer address: FFT --> ImgCtrl
+  output reg  [7:0]   byteFreqSample);              // frequency power (bin height): FFT --> ImgCtrl
 
   /******************************************************************/
   /* Local parameters and variables                                 */
   /******************************************************************/
 
-  // internal signals
+  // internal signals for registering outputs
 
-  wire            intEnaTime;
-  wire            intWeaTime;
-  reg    [10:0]   intAddraTime;
-  wire 			      intflgFreqSampleValid;
+  wire            intEnaTime;                       // port A enable for time buffer: FFT --> ImgCtrl
+  wire            intWeaTime;                       // sampling frequency a.k.a. time-domain data enable signal (48kHz)
+  reg    [10:0]   intAddraTime;                     // time buffer address: FFT --> ImgCtrl
+  wire 			      intflgFreqSampleValid;            // write enable for frequency buffer: FFT --> ImgCtrl
 
   // xfft_1 signals
 
-  reg             aresetn;                              // reset signal (set by FSM)
-  localparam      s_axis_config_tdata = 8'h00;    		// config data
+  reg             aresetn;                              // active-high reset signal controlled by FSM
+  localparam      s_axis_config_tdata = 8'h00;    		  // config data
   
   wire            s_axis_config_tvalid;                 // input flag for FFT (config data always valid) 
   wire            s_axis_config_tready;                 // output flag from FFT
@@ -49,16 +55,9 @@ module FftBlock (
   wire            s_axis_data_tready;                   // output flag from FFT
   wire            s_axis_data_tlast;                    // input flag to FFT (set by FSM)
   wire    [47:0]  m_axis_data_tdata;                    // output data from FFT
-  wire    [7:0]   m_axis_data_tbyte;                    // a byte of 'm_axis_data_tdata' (unused)
-  wire            m_axis_data_tvalid;                   // output flag from FFT (unused)
+  wire            m_axis_data_tvalid;                   // output flag from FFT
   wire            m_axis_data_tready;                   // always ready to get frequency samples
   wire            m_axis_data_tlast;                    // output data from FFT
-  wire            event_frame_started;                  // event ouput from FFT (unused)
-  wire            event_tlast_unexpected;               // event ouput from FFT (unused)
-  wire            event_tlast_missing;                  // event ouput from FFT (unused)
-  wire            event_status_channel_halt;            // event ouput from FFT (unused)
-  wire            event_data_in_channel_halt;           // event ouput from FFT (unused)
-  wire            event_data_out_channel_halt;          // event ouput from FFT (unused)
 
   // AXI state machine signals
 
@@ -177,7 +176,7 @@ module FftBlock (
       flgReset <= 1'b1;
     end
 
-	// valid sample && last sample negative && current sample positive
+	// if (valid sample) && (last sample negative) && (current sample positive)
 
     else if ((intWeaTime == 1) && (oldDinaTime_signed < 8'sd0) && (dinaTime_signed >= 8'sd0)) begin
       flgReset <= 1'b0;
@@ -258,16 +257,15 @@ module FftBlock (
   /******************************************************************/
   /* Registering outputs                                            */
   /******************************************************************/
-
-  // Choose power (height of FFT bars) thru switches [2:0] on Nexys4 board
   
   always@(posedge ckaTime) begin
 
-	enaTime <= intEnaTime;
-	// weaTime <= intWeaTime;
-	addraTime <= intAddraTime[9:0];
-	flgFreqSampleValid <= intflgFreqSampleValid;
-	addrFreq <= cntFftUnloadFreq;
+    enaTime             <= intEnaTime;                // port A enable for time buffer: FFT --> ImgCtrl
+    addraTime           <= intAddraTime[9:0];         // time buffer address: FFT --> ImgCtrl
+    flgFreqSampleValid  <= intflgFreqSampleValid;     // write enable for frequency buffer: FFT --> ImgCtrl
+    addrFreq            <= cntFftUnloadFreq;          // frequency buffer address: FFT --> ImgCtrl
+
+  // Choose sensitivity (i.e. scale height of FFT bars) thru switches [2:0] on Nexys4 board
 
     case (sw[2:0])
       3'b000 : byteFreqSample <= m_axis_data_tpower[30:23];
@@ -301,11 +299,11 @@ module FftBlock (
     .m_axis_data_tvalid             (intflgFreqSampleValid),            // O [ 0 ]
     .m_axis_data_tready             (m_axis_data_tready),               // I [ 0 ]
     .m_axis_data_tlast              (m_axis_data_tlast),                // O [ 0 ]
-    .event_frame_started            (event_frame_started),              // O [ 0 ]
-    .event_tlast_unexpected         (event_tlast_unexpected),           // O [ 0 ]
-    .event_tlast_missing            (event_tlast_missing),              // O [ 0 ]
-    .event_status_channel_halt      (event_status_channel_halt),        // O [ 0 ]
-    .event_data_in_channel_halt     (event_data_in_channel_halt),       // O [ 0 ]
-    .event_data_out_channel_halt    (event_data_out_channel_halt));     // O [ 0 ]
+    .event_frame_started            (       ),                          // O [ 0 ]
+    .event_tlast_unexpected         (       ),                          // O [ 0 ]
+    .event_tlast_missing            (       ),                          // O [ 0 ]
+    .event_status_channel_halt      (       ),                          // O [ 0 ]
+    .event_data_in_channel_halt     (       ),                          // O [ 0 ]
+    .event_data_out_channel_halt    (       ));                         // O [ 0 ]
 
 endmodule

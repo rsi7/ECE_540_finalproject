@@ -5,7 +5,7 @@
 // Top level module for the ECE 540 Final Project
 // on the Nexys4 DDR Board (Xilinx XC7A100T-CSG324)
 //
-//  Use the pushbuttons to control the menu:
+//  Use the pushbuttons to control the FFT color:
 //
 //	btnl			(function)
 //	btnu			(function)
