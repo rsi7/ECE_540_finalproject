@@ -387,8 +387,8 @@ module nexys4fpga (
 		.port_id 			(port_id),				// I [7:0] address of port id
 		.out_port 			(out_port),				// I [7:0] output from KCPSM6 --> input to interface
 		.in_port 			(in_port),				// O [7:0] output from inteface --> input to KCPSM6
-		.k_write_strobe 	(k_write_strobe),		// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
-		.write_strobe 		(write_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
+		.k_write_strobe 	(k_write_strobe),		// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUTK'
+		.write_strobe 		(write_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'OUTPUT'
 		.read_strobe 		(read_strobe),			// I [ 0 ] pulses high for one cycle when KCPSM6 runs 'INPUT'
 		.interrupt 			(interrupt),			// O [ 0 ] driven high --> force KCPSM to perform interrupt
 		.interrupt_ack		(interrupt_ack));		// I [ 0 ] pulses high for one cycle when KCPSM6 calls interrupt vector

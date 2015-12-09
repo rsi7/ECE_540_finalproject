@@ -3,6 +3,9 @@
                 ; === s6 - s0 registers are not dedicated  ===
                 ; === and keep their default names         ===
                 ; ============================================
+                NAMEREG sF, RegDig7                ; register for writing to Digit 7
+                NAMEREG sE, RegDig6                ; register for writing to Digit 6
+                NAMEREG sD, RegDig5                ; register for writing to Digit 5
                 NAMEREG sC, RegBtns                ; Pushbutton inputs
                 NAMEREG sB, RegCurrColor           ; Current color (RED, GRN, BLUE) being displayed
                 NAMEREG sA, RegCurrValue           ; 8-bit value of current color being displayed
@@ -38,12 +41,11 @@
                 CONSTANT MSK_BTN_UP, 04            ; Only keep db_pbtns[3]
                 CONSTANT MSK_BTN_RIGHT, 02         ; Only keep db_pbtns[2]
                 CONSTANT MSK_BTN_DOWN, 01          ; Only keep db_pbtns[1]
-                CONSTANT MSK_BTN_CPURESET, 00      ; Only keep db_pbtns[0]
                 CONSTANT MSK_LOW_4BITS, 0F         ; keep only [3:0] for R/G/B values
                 ;----- Color indicator for menu
-                CONSTANT SEGMENT_R, 0A             ; sevensegment value for displaying R
-                CONSTANT SEGMENT_G, 0B             ; sevensegment value for displaying G
-                CONSTANT SEGMENT_B, 0C             ; sevensegment value for displaying B
+                CONSTANT CODE_RED, 0A              ; state encoding for 'red'
+                CONSTANT CODE_GREEN, 0B            ; state encoding for 'green'
+                CONSTANT CODE_BLUE, 0C             ; state encoding for 'blue'
                 ;----- Default color values
                 CONSTANT DEFAULT_RED, 00           ; initial red value for FFT display
                 CONSTANT DEFAULT_GREEN, 0F         ; initial green value for FFT display
@@ -75,12 +77,12 @@
                 CALL bin2bcd                       ; converts RegCurrValue's binary data to decimal encoding
                 CALL write_7segment                ; write RegOnes, RegTens, RegCurrentColor to 7-segment display
                 CALL output_RGB                    ; outputs R, G, B values to FFT registers
-                CALL delay_100ms                   ; delay for 100ms, as there's no need to run at 100MHz
+                CALL delay_500ms                   ; delay for 500ms b/c we don't want menu to be too fast
                 JUMP main_L0                       ; rinse, dry, repeat
                 ; ========================================================================
                 ; ===   init_colors: Initialize RGB values for the FFT       ===
                 ; ========================================================================
-   init_colors: LOAD RegCurrColor, SEGMENT_R       ; load the current color as 'red'
+   init_colors: LOAD RegCurrColor, CODE_RED        ; load the current color as 'red'
                 STORE RegCurrColor, SP_CURR_STATE  ; store 'red' as current state for FSM
                 LOAD s0, DEFAULT_RED               ; initialize red value as 4'b0000
                 STORE s0, SP_RED_VALUE             ; store this red value into scratchpad
@@ -89,18 +91,24 @@
                 STORE s0, SP_GREEN_VALUE           ; store this green value into scratchpad
                 LOAD s0, DEFAULT_BLUE              ; initialize blue value as 4'b0000
                 STORE s0, SP_BLUE_VALUE            ; store this blue value into scratchpad
+                LOAD RegDig7, 00                   ; clear digit 7
+                LOAD RegDig6, 00                   ; clear digit 6
+                LOAD RegDig5, 00                   ; clear digit 5
                 RETURN                             ; return to main_L0
                 ; ================================================================================================================
                 ; ===    state_machine: updates state or R/G/B value based on current state & button inputs       ===
                 ; ================================================================================================================
- state_machine: COMPARE RegCurrColor, SEGMENT_R    ; check if the current state is 'red'
+ state_machine: COMPARE RegCurrColor, CODE_RED     ; check if the current state is 'red'
                 JUMP Z, state_red                  ; if so, jump to routine for handling that state
-                COMPARE RegCurrColor, SEGMENT_G    ; check if the current state is 'green'
+                COMPARE RegCurrColor, CODE_GREEN   ; check if the current state is 'green'
                 JUMP Z, state_green                ; if so, jump to routine for handling that state
-                COMPARE RegCurrColor, SEGMENT_B    ; check if the current state is 'blue'
+                COMPARE RegCurrColor, CODE_BLUE    ; check if the current state is 'blue'
                 JUMP Z, state_blue                 ; if so, jump to routine for handling that state
                 RETURN                             ; return to main_L0 (code shouldn't reach this point, though)
      state_red: STORE RegCurrValue, SP_RED_VALUE   ; keep 'red' value in scratchpad up-to-date
+                LOAD RegDig7, 1A                   ; load digit 7 with code for 'R'
+                LOAD RegDig6, 0E                   ; load digit 6 with code for 'E'
+                LOAD RegDig5, 0D                   ; load digit 5 with code for 'D'
                 LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
                 COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
                 JUMP Z, go_to_blue                 ; if so, change the current state to 'blue'
@@ -112,6 +120,9 @@
                 JUMP Z, dec_cur_val                ; if so, decrement the value of current color (red)
                 RETURN                             ; return to main_L0 if button inputs don't match
    state_green: STORE RegCurrValue, SP_GREEN_VALUE ; keep 'green' value in scratchpad up-to-date
+                LOAD RegDig7, 06                   ; load digit 7 with code for 'G'
+                LOAD RegDig6, 1A                   ; load digit 6 with code for 'R'
+                LOAD RegDig5, 1F                   ; load digit 5 with code for 'N'
                 LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
                 COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
                 JUMP Z, go_to_red                  ; if so, change the current state to 'red'
@@ -123,6 +134,9 @@
                 JUMP Z, dec_cur_val                ; if so, decrement the value of current color (green)
                 RETURN                             ; return to main_L0 if button inputs don't match
     state_blue: STORE RegCurrValue, SP_BLUE_VALUE  ; keep 'blue' value in scratchpad up-to-date
+                LOAD RegDig7, 0B                   ; load digit 7 with code for 'B'
+                LOAD RegDig6, 19                   ; load digit 6 with code for 'L'
+                LOAD RegDig5, 1E                   ; load digit 5 with code for 'U'
                 LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
                 COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
                 JUMP Z, go_to_green                ; if so, change the current state to 'green'
@@ -133,17 +147,17 @@
                 COMPARE s0, MSK_BTN_DOWN           ; see if only btnD is pressed
                 JUMP Z, dec_cur_val                ; if so, decrement the value of current color (blue)
                 RETURN                             ; return to main_L0 if button inputs don't match
-     go_to_red: LOAD RegCurrColor, SEGMENT_R       ; set the state as 'red'
+     go_to_red: LOAD RegCurrColor, CODE_RED        ; set the state as 'red'
                 STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
                 FETCH RegCurrValue, SP_RED_VALUE   ; fetch the stored 'red' value into current value reg
                 STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
                 RETURN                             ; return to main_L0
-   go_to_green: LOAD RegCurrColor, SEGMENT_G       ; set the state as 'green'
+   go_to_green: LOAD RegCurrColor, CODE_GREEN      ; set the state as 'green'
                 STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
                 FETCH RegCurrValue, SP_GREEN_VALUE ; fetch the stored 'green' value into current value reg
                 STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
                 RETURN                             ; return to main_L0
-    go_to_blue: LOAD RegCurrColor, SEGMENT_B       ; set the state as 'blue'
+    go_to_blue: LOAD RegCurrColor, CODE_BLUE       ; set the state as 'blue'
                 STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
                 FETCH RegCurrValue, SP_BLUE_VALUE  ; fetch the stored 'blue' value into current value reg
                 STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
@@ -181,12 +195,17 @@
                 ;
                 RETURN                             ; return to main_L0
                 ; ===========================================================================================
-                ;     write_7segment: writes Digits 0, 1, 4 to 7-segment display
+                ;     write_7segment: writes Digits [7:0] to 7-segment display
                 ; ===========================================================================================
 write_7segment: OUTPUT RegOnes, PA_DIG0            ; write BCD ones value --> digit 0
                 OUTPUT RegTens, PA_DIG1            ; write BCD tens value --> digit 1
-                FETCH s0, SP_CURR_STATE            ; fetch the current color into reg
-                OUTPUT s0, PA_DIG4                 ; write R/G/B color code --> digit 4
+                LOAD s0, 1D                        ; load reg s0 with 5'd29 (blank code)
+                OUTPUT s0, PA_DIG2                 ; send blank code --> digit 2
+                OUTPUT s0, PA_DIG3                 ; send blank code --> digit 3
+                OUTPUT s0, PA_DIG4                 ; send blank code --> digit 4
+                OUTPUT RegDig5, PA_DIG5            ; write color name --> digit 5
+                OUTPUT RegDig6, PA_DIG6            ; write color name --> digit 6
+                OUTPUT RegDig7, PA_DIG7            ; write color name --> digit 7
                 RETURN                             ; return to main_L0
                 ; ========================================================================
                 ; ===    output_RGB: Outputting RGB to ImgCtrl        ===

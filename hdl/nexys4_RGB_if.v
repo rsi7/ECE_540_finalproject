@@ -88,8 +88,8 @@ module nexys_RGB_if #(
 	reg 	[3:0]		PicoblazeGreen;
 	reg 	[3:0]		PicoblazeBlue;
 
-	integer clk_cnt_2Hz;
-	reg 	flag_2Hz;
+	integer 	clk_cnt_100Hz;
+	reg 		flag_100Hz;
 
 	/******************************************************************/
 	/* Servicing the KCPSM6 "READ" command		                  	  */
@@ -108,7 +108,7 @@ module nexys_RGB_if #(
 		else begin
 			
 			case (port_id)
-				PA_PBTNS: in_port <= {2'b0, btnCenter, btnLeft, btnUp, btnRight, btnDown, btnCpuReset};
+				PA_PBTNS: in_port <= {3'b0, btnCenter, btnLeft, btnUp, btnRight, btnDown};
 			endcase
 		end
 	end
@@ -150,9 +150,9 @@ module nexys_RGB_if #(
 				PA_DIG2: dig2 <= out_port[4:0];				
 				PA_DIG1: dig1 <= out_port[4:0];				
 				PA_DIG0: dig0 <= out_port[4:0];		
-				PA_PicoblazeRed : PicoblazeRed <= out_port;
+				PA_PicoblazeRed : 	PicoblazeRed <= out_port;
 				PA_PicoblazeGreen : PicoblazeGreen <= out_port;
-				PA_PicoblazeBlue : PicoblazeBlue <= out_port; 
+				PA_PicoblazeBlue : 	PicoblazeBlue <= out_port; 
 
 			endcase
 		end
@@ -177,10 +177,10 @@ module nexys_RGB_if #(
 			interrupt <= 1'b0;
 		end
 
-		// check for 2_Hz flag
+		// check for 100Hz flag
 		// if active, set interrupt flag for KCPSM6
 
-		else if (flag_2Hz) begin
+		else if (flag_100Hz) begin
 			interrupt <= 1'b1;	
 		end
 
@@ -192,23 +192,23 @@ module nexys_RGB_if #(
 
 	end
 
-	// procedural block to generate the 1 Hz flag
+	// procedural block to generate the 100 Hz flag
 	// if 'reset' is active, clear the flag & counter
 	// otherwise, if cycle completed ---> set the flag & reset counter
 	// otherwise, keep the flag off & increment counter
 
 	always @(posedge clk) begin
 		if (reset) begin
-			flag_2Hz <= 1'b0;
-			clk_cnt_2Hz <= 0;
+			flag_100Hz <= 1'b0;
+			clk_cnt_100Hz <= 0;
 		end
-		else if (clk_cnt_2Hz == 50000000) begin
-			flag_2Hz <= 1'b1;
-			clk_cnt_2Hz <= 0;
+		else if (clk_cnt_100Hz == 1000000) begin
+			flag_100Hz <= 1'b1;
+			clk_cnt_100Hz <= 0;
 		end
 		else begin
-			flag_2Hz <= 1'b0;
-			clk_cnt_2Hz <= clk_cnt_2Hz + 1'b1;
+			flag_100Hz <= 1'b0;
+			clk_cnt_100Hz <= clk_cnt_100Hz + 1'b1;
 		end
 	end
 

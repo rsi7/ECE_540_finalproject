@@ -226,7 +226,8 @@ localparam lol = 7'b1001111;
 localparam lor = 7'b0101111;
 
 localparam  blank = 7'b1111111;
-
+localparam  upU = 7'b1000001;
+localparam  upN = 7'b1001000;
 
 always @ (posedge clk) begin
 	case (d)
@@ -259,6 +260,8 @@ always @ (posedge clk) begin
 		5'd27: seg <= {~dp,lol};
 		5'd28: seg <= {~dp,lor};
 		5'd29: seg <= {~dp,blank};
+		5'd30: seg <= {~dp,upU};
+		5'd31: seg <= {~dp,upN};
 		
 		default: seg <= {~dp,blank};
 	endcase

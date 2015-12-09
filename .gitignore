@@ -14,6 +14,14 @@ $ cat .gitignore
 
 /docs/*
 
+# exclude assembler logs, fmt, hex files
+# because they generate too many file changes
+
+/firmware/*
+!/firmware/*.v
+!/firmware/*.psm
+!/firmware/*.exe
+
 # exclude reference code
 
 /ref/*
