@@ -252,7 +252,7 @@ module nexys4fpga (
 
 	FftBlock FFT (
 
-		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the FFT state machine
+		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the FFT state machine every 10Hz
 		.btnL 					(db_btns[4]),				// I [ 0 ] pushbutton to reset FFT state machine
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
 		.ckaTime 				(CLK_100MHZ),				// I [ 0 ] 100MHz system clock from ClockWiz
