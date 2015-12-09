@@ -8,6 +8,12 @@ $ cat .gitignore
 
 /vivado/*
 
+# ignore everything in docs
+# these are just PDFs and Word files
+# available on D2L course website
+
+/docs/*
+
 # exclude reference code
 
 /ref/*
