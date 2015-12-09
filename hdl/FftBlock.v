@@ -34,7 +34,7 @@ module FftBlock (
   wire            intEnaTime;
   wire            intWeaTime;
   reg    [10:0]   intAddraTime;
-  wire 			  intflgFreqSampleValid;
+  wire 			      intflgFreqSampleValid;
 
   // xfft_1 signals
 

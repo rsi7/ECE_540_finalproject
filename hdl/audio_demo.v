@@ -1,8 +1,10 @@
-// audio_demo.v - audio controller
+// audio_demo.v - module for decoding & filtering microphone data
 //
 // Description:
-// ------------
-//
+// 
+// This module instantiates the PDM filter, which does most of the work
+// It then synchronizes the signals from the filter's 3MHz clock domain
+// And downsamples the 96kHz 'fs_int' signal to 48khz before outputting it as 'data_mic_valid'
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -12,37 +14,40 @@ module audio_demo (
    /* Top-level port declarations                                    */
    /******************************************************************/
 
-	input            	clk_i,
-	input 				clk_6_144MHz,
-	input 				clk_locked, 
-	input             	rst_i,
+	input            	clk_i,						// 100MHz system clock from ClockWiz
+	input 				clk_6_144MHz,				// 6.144MHz clock from ClockWiz
+	input 				clk_locked, 				// active-high flag indicating clock is stable
+	input             	rst_i,						// active-high reset for module
 
-   // PDM interface with Mic
+	// Connections with board's analog-to-digital converter
 
-	input             	pdm_data_i,
-	output 	         	pdm_clk_o,
-	output reg         	pdm_lrsel_o,
+	input             	pdm_data_i,					// pulse-density modulated data coming from ADC
+	output 	         	pdm_clk_o,					// 3MHz clock needed by the on-board ADC
+	output reg         	pdm_lrsel_o,				// tied to 1'b0 for left channel only
 
-   // parallel data from mic
+	// Connections with FFT & ImgCtrl
 
-	output reg    		data_mic_valid,
-	output reg 	[15:0]	data_mic);
+	output reg    		data_mic_valid,				// sampling frequency a.k.a. time-domain data enable signal (48kHz)
+	output reg 	[15:0]	data_mic);					// decoded time-sample data from PDM filter
 				
    /******************************************************************/
    /* Local parameters and variables                                 */
    /******************************************************************/
    
 	wire	[15:0]		data_int;
-	wire    [16:0]  	pdm_acc;
-	wire    [15:0]  	pdm_data;
-	wire    			fs_int;
-	wire       			fs_rise;
+
+	// signals for dividing sampling frequency to 48kHz
+
+	wire    			fs_int;			// 96kHz sampling frequency from lowpass filter
+	wire       			fs_rise;		// indicates rising edge of fs_int
 	wire				fs_comb;
-	reg          		fs_tmp;
-	reg					fss_tmp;
-				
 	integer     		cnt = 0;
 
+	// signals for 2-stage synchronizer
+
+	reg          		fs_tmp;			// stage 1
+	reg					fss_tmp;		// stage 2
+				
    /******************************************************************/
    /* PDM instantiation                                              */
    /******************************************************************/
@@ -52,24 +57,26 @@ module audio_demo (
 		// Global signals
 				
 		.clk_i         	(clk_i),               	// I [ 0 ] 100MHz system clock
-		.clk_6_144MHz 	(clk_6_144MHz),			// I [ 0 ]
-		.clk_locked		(clk_locked), 			// I [ 0 ]
+		.clk_6_144MHz 	(clk_6_144MHz),			// I [ 0 ] 6.144MHz clock from ClockWiz
+		.clk_locked		(clk_locked), 			// I [ 0 ] active-high flag indicating clock is stable
 		.rst_i         	(rst_i),               	// I [ 0 ] active-high system reset
 
-		// PDM interface w/ microphone
+		// Connections with board's analog-to-digital converter
 				
-		.pdm_clk_o     (pdm_clk_o),           // O [ 0 ]
-		.pdm_data_i    (pdm_data_i),          // I [ 0 ]
+		.pdm_clk_o     (pdm_clk_o),           // O [ 0 ] 3MHz clock needed by the on-board ADC
+		.pdm_data_i    (pdm_data_i),          // I [ 0 ] pulse-density modulated data coming from ADC
 
-		// output data to audio_demo
+		// Connections with AudioGen
 
-		.fs_o          (fs_int),              // O [ 0 ]
-		.data_o        (data_int));           // O [15:0]	
+		.fs_o          (fs_int),              // O [ 0 ]  synchronized before being output as data_mic_valid
+		.data_o        (data_int));           // O [15:0] registered before being output as data_mic	
 	
    /******************************************************************/
-   /* Synchronize signals from the PDM                               */
+   /* Synchronize signals from PDM                        		     */
    /******************************************************************/
    
+   	// 2-stage synchronizer for 3MHz domain signals
+
 	always @(posedge clk_i) begin
 		fs_tmp 	<= fs_int;
 		fss_tmp <= fs_tmp;
@@ -78,31 +85,15 @@ module audio_demo (
 	/******************************************************************/
 	/* Local parameters and variables				                  */
 	/******************************************************************/
+	
+	// set 'fs_rise' high on the rising edge of 'fs_int'
+	// when it has gone through 1st stage of synchronizer
 
-   	assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
-   
-/*	always	@(posedge fs_int) begin
-		if ((fs_tmp == 1) && (fss_tmp == 0)) begin	
-			fs_rise <= 1'b1;
-		end
+   	assign 	fs_rise = (fs_tmp == 1) && (fss_tmp == 0);
+ // assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
 
-		else begin	
-			fs_rise <= 1'b0;
-		end
-	end	*/	
-
-
-   	assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
-
-/*	always@ (posedge clk_i) begin
-		if ((cnt == 1) && (fs_rise == 1)) begin  
-			fs_comb <= 1;
-		end
-
-		else begin
-			fs_comb <= 0;
-		end
-	end*/	
+   	assign 	fs_comb = (cnt == 1) && (fs_rise == 1);
+ // assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
 	
    /******************************************************************/
    /* Divide the fs by two (48kHz sampling rate)                     */
@@ -110,7 +101,7 @@ module audio_demo (
 
 	always @ (posedge clk_i) begin
 
-		if (rst_i == 1) begin								// reset logic
+		if (rst_i == 1) begin
 			cnt <= 0;
 		end
 

@@ -43,17 +43,17 @@ module nexys4fpga (
 
 	// VGA signals
 
-	output 				vga_hsync,				// horizontal sync pulse
-	output 				vga_vsync,				// vertical sync pulse
-	output 	[3:0]		vga_red,				// red pixel data --> send to screen
-	output 	[3:0]		vga_green,				// green pixel data --> send to screen
-	output 	[3:0]		vga_blue,				// blue pixel data --> send to screen
+	output 				vga_hsync,				// horizontal sync pulse for 512x480 screen (60Hz refresh)
+	output 				vga_vsync,				// vertical sync pulse for 512x480 screen (60Hz refresh)
+	output 	[3:0]		vga_red,				// red data for current pixel --> send to screen
+	output 	[3:0]		vga_green,				// green data for current pixel --> send to screen
+	output 	[3:0]		vga_blue,				// blue data for current pixel --> send to screen
 
-	// Microphone signals
+	// Analog-to-digital converter signals
 
-	input 				micData,
-	output 				micClk,
-	output 				micLRSel);
+	input 				micData,				// pulse-density modulated data coming from ADC
+	output 				micClk,					// 3MHz clock needed by the on-board ADC
+	output 				micLRSel);				// tied to 1'b0 for left channel only
 
 	/******************************************************************/
 	/* Local parameters and variables				                  */
@@ -76,7 +76,7 @@ module nexys4fpga (
 	wire	[17:0]		instruction;
 	wire				bram_enable;
 
-	// Connections between KCPSM6 <--> nexys4_rgb_if
+	// Connections between KCPSM6 <--> RGBInterface
 
 	wire	[7:0]		port_id;
 	wire	[7:0]		out_port;
@@ -87,12 +87,12 @@ module nexys4fpga (
 	wire				interrupt;
 	wire				interrupt_ack;
 
-	// Connections between debounce <--> PicoBlaze
+	// Connections between debounce <--> Picoblaze
 
 	wire 	[15:0]		db_sw;						// debounced switches
 	wire 	[5:0]		db_btns;					// debounced buttons
 	
-	// Connections between sevensegment <--> PicoBlaze
+	// Connections between sevensegment <--> Picoblaze
 
 	wire 	[4:0]		dig7, dig6, dig5, dig4, 	// display digits [7:4]
 						dig3, dig2, dig1, dig0;		// display digits [3:0]
@@ -103,57 +103,57 @@ module nexys4fpga (
 	wire    [7:0]       segs_int;               	// segments and the decimal point
 	wire 	[63:0]		digits_out;					// ASCII digits (only for simulation)
 
-	// Connections between audio_demo <--> FFT
+	// Connections between AudioGen <--> FFT & ImgCtrl
 
-	wire	[15:0]		wordTimeSample;				// data_mic (audio_demo) --> dina (Time buffer)
-	wire 				flgTimeSampleValid;			// data_mic_valid (audio_demo) --> wea (Time buffer)
-	wire 				flgTimeFrameActive;			// time address counter (FFT_Block) --> ena (Time buffer)
-	wire 	[9:0] 		addraTime;					// time address counter (FFT_Block) --> addra (Time buffer)
-	wire 	[7:0] 		byteFreqSample; 			// data_mic (FFT_Block) --> dina (Time buffer)
-	wire 				flgFreqSampleValid;			// flgFreqSampleValid (FFT_Block) --> wea (frequency buffer)
-	wire 	[9:0] 		addraFreq;					// frequency address counter (FFT_Block) --> addra (frequency buffer)
+	wire	[15:0]		wordTimeSample;				// time-domain sample: AudioGen --> FFT & ImgCtrl
+	wire 				flgTimeSampleValid;			// write enable for time buffer: AudioGen --> FFT & ImgCtrl
 
-	// Connections between VgaCtrl <--> ImgCtrl
+	// Connections between FFT <--> ImgCtrl
 
-	wire 				flgActiveVideo;
-	wire 	[9:0]		adrHor;
-	wire	[9:0]		adrVer;
+	wire 				flgTimeFrameActive;			// port A enable for time buffer: FFT --> ImgCtrl
+	wire 	[9:0] 		addraTime;					// time buffer address: FFT --> ImgCtrl
+	wire 	[7:0] 		byteFreqSample; 			// frequency power (bin height):  FFT --> ImgCtrl
+	wire 				flgFreqSampleValid;			// write enable for frequency buffer: FFT --> ImgCtrl
+	wire 	[9:0] 		addraFreq;					// frequency buffer address: FFT --> ImgCtrl
 
-	// Internal signals for 10Hz flag generator block
+	// Connections between DTG <--> ImgCtrl
 
-	reg 				flgStartAcquisition;		// 10Hz flag
+	wire 				flgActiveVideo;				// flag indicating whether current pixel is in 512x480 frame
+	wire 	[9:0]		adrHor;						// pixel column (x-coordinate)
+	wire	[9:0]		adrVer;						// pixel row (y-coordinate)
+
+	// Connections between RGBInterface <--> ImgCtrl
+
+	wire 	[11:0]		PicoblazeRGB;				// RGB values to use in FFT display
+
+	// Connections between ImgCtrl <--> Nexys4
+
+	wire 	[11:0] 		OutputRGB;					// RGB values for VGA current pixel
+
+	// Internal signals for flgStartAcquisition block
+
+	reg 				flgStartAcquisition;		// 10Hz flag to restart FFT state machine
 	integer 			cntPresc;					// counter from 0 - 2,499,999
-
-	// RGB wire between RGBInterface <--> ImgCtrl
-
-	wire 	[11:0]		PicoblazeRGB;
-
-	// RGB output ImgCtrl; gets split and sent to VGA monitor
-
-	wire 	[11:0] 		OutputRGB;
-
-	// debugging
-
-	reg 	[7:0]		led_reg;
 
 	/******************************************************************/
 	/* Global Assignments							                  */
 	/******************************************************************/			
 	
-	assign 	sysreset = ~db_btns[0]; 	// btnCpuReset is asserted low --> sysreset is active-high
+	assign 	sysreset = ~db_btns[0]; 			// btnCpuReset is asserted low --> sysreset is active-high
 
-	assign 	dp  = segs_int [7];			// sending decimal signals --> FPGA pins
-	assign 	seg = segs_int [6:0];		// sending digit signals --> FPGA pins
+	assign 	dp  = segs_int [7];					// sending decimal signals --> FPGA pins
+	assign 	seg = segs_int [6:0];				// sending digit signals --> FPGA pins
 
-	assign 	led = led_reg;
-
-	assign 	vga_red = {OutputRGB[11:8]};
-	assign 	vga_green = {OutputRGB[7:4]};
-	assign 	vga_blue = {OutputRGB[3:0]};
+	assign 	vga_red = {OutputRGB[11:8]};		// send 4-bits for red value in current pixel
+	assign 	vga_green = {OutputRGB[7:4]};		// send 4-bits for green value in current pixel
+	assign 	vga_blue = {OutputRGB[3:0]};		// send 4-bits for blue value in current pixel
 
 	/******************************************************************/
-	/* 10Hz flag generator block					                  */
+	/* flgStartAcquisition generator block 			                  */
 	/******************************************************************/
+
+	// generates a flag every 10Hz
+	// used to reset FFT state machine
 
 	always@(posedge CLK_25MHZ) begin
 
@@ -166,14 +166,6 @@ module nexys4fpga (
 			cntPresc <= cntPresc + 1'b1;
 			flgStartAcquisition <= 1'b0;
 		end
-	end
-
-	always@(posedge CLK_25MHZ) begin
-
-		if (flgStartAcquisition) begin
-			led_reg <= byteFreqSample;
-		end
-
 	end
 
 	/******************************************************************/
@@ -238,21 +230,21 @@ module nexys4fpga (
 
 	audio_demo AudioGen (
 
-		.clk_i 					(CLK_100MHZ),				// I [ 0 ]
-		.clk_6_144MHz 			(CLK_6MHZ),					// I [ 0 ]
-		.clk_locked				(clk_locked),				// I [ 0 ] 
-		.rst_i					(1'b0),						// I [ 0 ]  active-high reset for audio_demo
+		.clk_i 					(CLK_100MHZ),				// I [ 0 ] 100MHz system clock from ClockWiz
+		.clk_6_144MHz 			(CLK_6MHZ),					// I [ 0 ] 6.144MHz clock from ClockWiz
+		.clk_locked				(clk_locked),				// I [ 0 ] active-high flag indicating clock is stable
+		.rst_i					(1'b0),						// I [ 0 ] active-high reset for module
 
-		// PDM interface with the MIC
+		// Connections with board's analog-to-digital converter
 
-		.pdm_clk_o 				(micClk),					// O [ 0 ]
-		.pdm_lrsel_o 			(micLRSel),					// O [ 0 ]
-		.pdm_data_i				(micData),					// I [ 0 ]
+		.pdm_clk_o 				(micClk),					// O [ 0 ] 3MHz clock needed by the on-board ADC
+		.pdm_lrsel_o 			(micLRSel),					// O [ 0 ] tied to 1'b0 for left channel only
+		.pdm_data_i				(micData),					// I [ 0 ] pulse-density modulated data coming from ADC
 
-		// Parallel data from MIC
+		// Connections with FFT & ImgCtrl
 
-		.data_mic_valid 		(flgTimeSampleValid),		// O [ 0 ]  output from audio_demo and FftBlock (48MHz data enable)
-		.data_mic 				(wordTimeSample));			// O [15:0] data from PDM decoder
+		.data_mic_valid 		(flgTimeSampleValid),		// O [ 0 ]  sampling frequency a.k.a. time-domain data enable signal (48kHz)
+		.data_mic 				(wordTimeSample));			// O [15:0] decoded time-sample data from PDM filter
 
 	/******************************************************************/
 	/* FFT instantiation                       					  	  */
@@ -260,18 +252,24 @@ module nexys4fpga (
 
 	FftBlock FFT (
 
-		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the state machine
-		.btnL 					(db_btns[4]),
+		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the FFT state machine
+		.btnL 					(db_btns[4]),				// I [ 0 ] pushbutton to reset FFT state machine
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
-		.ckaTime 				(CLK_100MHZ),				// I [ 0 ]
-		.enaTime 				(flgTimeFrameActive),		// O [ 0 ]
-		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] output from audio_demo and FftBlock
-		.addraTime 				(addraTime),				// O [9:0]
-		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0]
-		.ckFreq 				(CLK_25MHZ),				// I [ 0 ]
-		.flgFreqSampleValid 	(flgFreqSampleValid),		// O [ 0 ]
-		.addrFreq 				(addraFreq),				// O [9:0]
-		.byteFreqSample 		(byteFreqSample));			// O [7:0]
+		.ckaTime 				(CLK_100MHZ),				// I [ 0 ] 100MHz system clock from ClockWiz
+		.ckFreq 				(CLK_25MHZ),				// I [ 0 ] 25MHz clock from ClockWiz
+
+		// Connections with AudioGen
+
+		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] sampling frequency a.k.a. time-domain data enable signal (48kHz)
+		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0] decoded time-sample data from PDM filter
+
+		// Connections with ImgCtrl
+
+		.enaTime 				(flgTimeFrameActive),		// O [ 0 ] port A enable for time buffer: FFT --> ImgCtrl
+		.addraTime 				(addraTime),				// O [9:0] time buffer address: FFT --> ImgCtrl
+		.flgFreqSampleValid 	(flgFreqSampleValid),		// O [ 0 ] write enable for frequency buffer: FFT --> ImgCtrl
+		.addrFreq 				(addraFreq),				// O [9:0] frequency buffer address: FFT --> ImgCtrl
+		.byteFreqSample 		(byteFreqSample));			// O [7:0] frequency power (bin height): FFT --> ImgCtrl
 
 	/******************************************************************/
 	/* DTG instantiation      			      					  	  */
@@ -279,13 +277,21 @@ module nexys4fpga (
 
  	dtg DTG (
 
- 		.clock 			(CLK_25MHZ),		// I [ 0 ]
- 		.rst 			(sysreset),			// I [ 0 ]
- 		.horiz_sync 	(vga_hsync),		// O [ 0 ]
- 		.vert_sync		(vga_vsync),		// O [ 0 ]
- 		.video_on 		(flgActiveVideo),	// O [ 0 ]
- 		.pixel_row 		(adrVer),			// O [9:0]
- 		.pixel_column 	(adrHor));			// O [9:0]
+ 		// Global signals
+
+ 		.clock 			(CLK_25MHZ),		// I [ 0 ] 25MHz clock for video timing signals from ClockWiz
+ 		.rst 			(sysreset),			// I [ 0 ] active-high system reset for module
+
+ 		// Generated timing signals
+
+ 		.horiz_sync 	(vga_hsync),		// O [ 0 ] horizontal sync pulse for 512x480 screen (60Hz refresh)
+ 		.vert_sync		(vga_vsync),		// O [ 0 ] vertical sync pulse for 512x480 screen (60Hz refresh)
+ 		.video_on 		(flgActiveVideo),	// O [ 0 ] active-high flag if current pixel is in 512x480 display frame
+
+ 		// pixel coordinates
+
+ 		.pixel_row 		(adrVer),			// O [9:0] y-coordinate of current pixel
+ 		.pixel_column 	(adrHor));			// O [9:0] x-coordinate of current pixel
 
 	/******************************************************************/
 	/* Image_Controller instantiation          					  	  */
@@ -293,36 +299,37 @@ module nexys4fpga (
 
 	ImgCtrl Image_Controller (
 
-		.ck100MHz 				(CLK_100MHZ), 				// I [ 0 ]
+		// Global signals
 
-		// Time-domain signals
+		.ck100MHz 				(CLK_100MHZ), 				// I [ 0 ] 100MHz system clock from ClockWiz
 
-		.enaTime 				(flgTimeFrameActive),		// I [ 0 ]
-		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] output from audio_demo and FftBlock
-		.addraTime 				(addraTime),				// I [9:0]
-		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0]
+		// Connections with AudioGen
 
-		// Frequency-domain signals
+		.weaTime 				(flgTimeSampleValid),		// I [ 0 ] sampling frequency a.k.a. time-domain data enable signal (48kHz)
+		.dinaTime 				(wordTimeSample[10:3]),		// I [7:0] decoded time-sample data from PDM filter
 
-// 		.enaFreq 				(1'b1)						// I [ 0 ]
-		.weaFreq				(flgFreqSampleValid),		// I [ 0 ]
-		.addraFreq 				(addraFreq),				// I [9:0]
-		.dinaFreq				(byteFreqSample),			// I [7:0]
+		// Connections with FFT
 
-		// Video Signals
+		.enaTime 				(flgTimeFrameActive),		// I [ 0 ] port A enable for time buffer: FFT --> ImgCtrl
+		.addraTime 				(addraTime),				// I [9:0] time buffer address: FFT --> ImgCtrl
+		.weaFreq				(flgFreqSampleValid),		// I [ 0 ] write enable for frequency buffer: FFT --> ImgCtrl
+		.addraFreq 				(addraFreq),				// I [9:0] frequency buffer address: FFT --> ImgCtrl
+		.dinaFreq				(byteFreqSample),			// I [7:0] frequency power (bin height): FFT --> ImgCtrl
 
-		.ckVideo				(CLK_25MHZ),				// I [ 0 ]
-		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ]
-		.adrHor					(adrHor),					// I [9:0]
-		.adrVer					(adrVer),					// I [9:0]
+		// Connections with DTG
 
-		// RGB output from ImgCtrl
+		.ckVideo				(CLK_25MHZ),				// I [ 0 ] 25MHz clock for video timing signals from ClockWiz
+		.flgActiveVideo 		(flgActiveVideo),			// I [ 0 ] active-high flag if current pixel is in 512x480 display frame
+		.adrHor					(adrHor),					// I [9:0] x-coordinate of current pixel
+		.adrVer					(adrVer),					// I [9:0] y-coordinate of current pixel
 
-		.OutputRGB 				(OutputRGB),				// O [11:0]
+		// Connections with VGA display
 
-		// RGB input from Picoblaze
+		.OutputRGB 				(OutputRGB),				// O [11:0] RGB values for VGA current pixel
 
-		.PicoblazeRGB			(PicoblazeRGB));			// I [11:0]
+		// Connections with RGBInterface
+
+		.PicoblazeRGB			(PicoblazeRGB));			// I [11:0] RGB values to use in FFT display
 
 	/******************************************************************/
 	/* RGBInterface instantiation		                              */
@@ -341,18 +348,18 @@ module nexys4fpga (
 
 		// connections with sevensegment
 
-		.dig7 	(dig7),			// O [4:0] digit #7 signal for sevensegment
-		.dig6 	(dig6),			// O [4:0] digit #6 signal for sevensegment
-		.dig5 	(dig5),			// O [4:0] digit #5 signal for sevensegment
-		.dig4 	(dig4),			// O [4:0] digit #4 signal for sevensegment
-		.dig3 	(dig3),			// O [4:0] digit #3 signal for sevensegment
-		.dig2 	(dig2),			// O [4:0] digit #2 signal for sevensegment
-		.dig1 	(dig1),			// O [4:0] digit #1 signal for sevensegment
-		.dig0 	(dig0),			// O [4:0] digit #0 signal for sevensegment
+		.dig7 	(dig7),			// O [4:0] digit #7 signal --> sevensegment
+		.dig6 	(dig6),			// O [4:0] digit #6 signal --> sevensegment
+		.dig5 	(dig5),			// O [4:0] digit #5 signal --> sevensegment
+		.dig4 	(dig4),			// O [4:0] digit #4 signal --> sevensegment
+		.dig3 	(dig3),			// O [4:0] digit #3 signal --> sevensegment
+		.dig2 	(dig2),			// O [4:0] digit #2 signal --> sevensegment
+		.dig1 	(dig1),			// O [4:0] digit #1 signal --> sevensegment
+		.dig0 	(dig0),			// O [4:0] digit #0 signal --> sevensegment
 
 		// connections with ImgCtrl
 
-		.PicoblazeRGB			(PicoblazeRGB),			// O [11:0]
+		.PicoblazeRGB			(PicoblazeRGB),		// O [11:0] RGB values to use in FFT display
 
 		// connections with KCPSM6
 

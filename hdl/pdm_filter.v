@@ -1,23 +1,40 @@
+// pdm_filter.v - module for decoding & filtering microphone data
+//
+// Description:
+// 
+// This module decodes the pulse-density modulated (PDM) data from
+// analog-to-digital converter on Nexys4DDR board. It then passes the
+// data through a series of 4 filters: CIC, halfband, lowpass, highpass
+//
+// It is heavily based Mihaita Nagy's "pdm_filter.vhd" module
+// Most of the filters can be generated from Vivado FIR & CIC Compiler tools in the IP Catalog
+//
+// The module samples input data at 3.072MHz and outputs 16-bit samples at 96kHz
+//
+////////////////////////////////////////////////////////////////////////////////////////////////
+
 module pdm_filter (
 
 	/******************************************************************/
 	/* Top-level port declarations	   						          */
 	/******************************************************************/
 
-	input 				clk_i,
-	input 				clk_6_144MHz,
-	input 				clk_locked,             
-	input				rst_i,
+	// Global signals
 
-	// PDM interface to microphone
+	input 				clk_i,				// 100MHz system clock from ClockWiz
+	input 				clk_6_144MHz,		// 6.144MHz clock from ClockWiz
+	input 				clk_locked,        	// active-high flag indicating clock is stable
+	input				rst_i,				// active-high reset for module
 
-	output 				pdm_clk_o,         
-	input 				pdm_data_i,      
+	// Connections with board's analog-to-digital converter
+
+	output 				pdm_clk_o,       	// 3MHz clock needed by the on-board ADC
+	input 				pdm_data_i,      	// pulse-density modulated data coming from ADC
       
-	// output data
+	// Connections with AudioGen
 	
-	output reg			fs_o,              
-	output reg 	[15:0]	data_o);          
+	output reg			fs_o,              // sampling frequency from lowpass filter
+	output reg 	[15:0]	data_o);           // output data from lowpass filter
 
 	/******************************************************************/
 	/* Local parameters and variables				                  */
@@ -54,26 +71,11 @@ module pdm_filter (
 	reg 	[15:0]			data_o_temp;	
 				
 	//******************************************************************/
-	//* ClockWiz6MHz instantiation							           */
+	//* 3.072MHz Clock Generator							           */
 	//******************************************************************/
-	
-/*	 //Sampling clock generator (3.072 MHz)
 
-	clk_wiz_0 ClockWiz6MHz (
-
-		// Clock Input ports
-		.clk_in1	(clk_i),				// Give ClockWiz the 100MHz crystal oscillator signal
-
-		// Clock Output ports
-		.clk_out1	(clk_6_144MHz),			// Generate 6.144MHz clock to use
-
-		// Status and control signals
-		.reset 		(1'b0),					// active-high reset for the clock generator
-		.locked 	(clk_locked));			// set high when output clocks have correct frequency & phase*/
-	
-	//******************************************************************/
-	//* 3.072MHz clock generation							           */
-	//******************************************************************/
+	// Use built-in BUFR device to divide 6.144MHz clock --> 3.072MHz clock
+	// because ClockWiz cannot generate lower than 4MHz
 
 	BUFR  #(
 
@@ -87,29 +89,33 @@ module pdm_filter (
 		.CLR 		(1'b0),
 		.O			(clk_3_072MHz));
    
-   // Buffering the divided clock (3.072 MHz)
+   // Buffering the 3.072MHz clock
    
 	BUFG ClkDivBuf(
 
 		.I 			(clk_3_072MHz),
 		.O			(clk_3_072MHz_buf));
 					
-	// Outputing the microphone clock
+	/******************************************************************/
+	/* Global Assignments							                  */
+	/******************************************************************/
+
+	// Outputing the 3.072MHz clock to the analog-to-digital converter
   
 	assign pdm_clk_o = clk_locked ? clk_3_072MHz_buf : 1'b1;
 
-   	/******************************************************************/
-	/* Send input data from PDM to CIC filter		                  */
-	/******************************************************************/
+	// Giving pulse-density modulated input data from ADC to the CIC filter
 
-   	assign 	s_cic_tdata = {{7{!pdm_data_i}}, 1'b1};
+	assign 	s_cic_tdata = {{7{!pdm_data_i}}, 1'b1};
 
 	/******************************************************************/
 	/* CIC instantiation		 	          	                      */
 	/******************************************************************/
 
-   // This filter downsamples the incoming 3.072MHz signal to 192kHz.
-			
+	// Cascaded-Integrator-Comb (CIC) filter which downsamples the incoming 3.072MHz signal to 192kHz
+   	// cic.vhd module generated from Vivado CIC Compiler 3.0
+   	// N = 5, R = 8, M = 1
+
 	cic CIC(
   
 		.aclk 					(clk_3_072MHz_buf),
@@ -123,7 +129,12 @@ module pdm_filter (
 	/* Halfband instantiation	 	          	                      */
 	/******************************************************************/
    
-   hb_fir HB(
+   	// halfband FIR filter with decimation ratio = 2 and fs = 192kHz
+   	// further downsamples the data to 96kHz output sample rate
+   	// hb_fir.vhd module generated from Vivado FIR Compiler 6.3
+   	// uses hb_fir.mif for initialization
+
+	hb_fir HB(
    
 		.aclk 					(clk_3_072MHz_buf),
 		.s_axis_data_tvalid 	(m_cic_tvalid),
@@ -136,6 +147,10 @@ module pdm_filter (
 	/******************************************************************/
 	/* Lowpass instantiation	 	          	                      */
 	/******************************************************************/
+
+   	// lowpass FIR filter with no decimation and fs = 96kHz
+   	// lp_fir.vhd module generated from Vivado FIR Compiler 6.3
+   	// uses lp_fir.mif for initialization
 
 	lp_fir  LP(
       
@@ -151,7 +166,11 @@ module pdm_filter (
 	/* Highpass instantiation	 	          	                      */
 	/******************************************************************/
 
-   hp_rc HP(
+	// highpass filter 
+	// hp_rc.vhd module by Mihaita Nagy (Digilent)
+	// Based on Xilinx's WP279, this module models a first-order highpass RC filter
+
+	hp_rc HP(
    
 		.clk_i                	(clk_3_072MHz_buf),
 		.rst_i                	(rst_i),
@@ -160,12 +179,17 @@ module pdm_filter (
 		.data_o               	(data_o_HP));
 
 	/******************************************************************/
-	/* Synchronizing data from filters and registering outputs        */
+	/* Synchronizing data from 3MHz filters and registering outputs   */
 	/******************************************************************/
 
 	always @(posedge clk_i) begin
+
+		// synchronizing the sampling frequency output
+
 		fs_o_temp <= m_lp_tvalid;
 		fs_o <= fs_o_temp;
+
+		// synchronizing the filtered time-domain data
 
 		data_o_temp <= data_o_HP;
 		data_o <= data_o_temp;
