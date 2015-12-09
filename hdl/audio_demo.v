@@ -89,11 +89,9 @@ module audio_demo (
 	// set 'fs_rise' high on the rising edge of 'fs_int'
 	// when it has gone through 1st stage of synchronizer
 
-   	assign 	fs_rise = (fs_tmp == 1) && (fss_tmp == 0);
- // assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
+ 	assign 	fs_rise =  fs_tmp ? (fss_tmp ? 1'b0: 1'b1) : (1'b0);
 
-   	assign 	fs_comb = (cnt == 1) && (fs_rise == 1);
- // assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
+ 	assign	fs_comb = cnt ? (fs_rise ? 1'b1 : 1'b0 ) : (1'b0);
 	
    /******************************************************************/
    /* Divide the fs by two (48kHz sampling rate)                     */
