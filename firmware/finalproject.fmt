@@ -1,375 +1,289 @@
-                  ; ============================================
-                  ; === Register Names                       ===
-                  ; === s6 - s0 registers are not dedicated  ===
-                  ; === and keep their default names         ===
-                  ; ============================================
-                  NAMEREG sF, Fft_Red_reg           ; RGB red
-                  NAMEREG sE, Fft_Green_reg         ; RGB Green
-                  NAMEREG sD, Fft_Blue_reg          ; RGB Blue
-                  NAMEREG sC, pbtns_reg             ; Pushbutton
-                  NAMEREG sB, color_reg             ; Current Color, red or green or blue
-                  NAMEREG sA, dv_reg                ; Current value of red or green or blue
-                  NAMEREG s9, DIG100S               ; Hundreds digit
-                  NAMEREG s8, DIG10S                ; Tens digit
-                  NAMEREG s7, DIG1S                 ; Ones digit...also used to pass in
-                  ; ======================
-                  ; === Port Addresses ===
-                  ; ======================
-                  ;------Pushbutton---
-                  CONSTANT PA_PBTNS, 00             ; (i) pushbuttons inputs
-                  ;------SEVENSEGMENT---
-                  CONSTANT PA_DIG7, 01              ; (i) slide switches
-                  CONSTANT PA_DIG6, 02              ; (o) LEDs
-                  CONSTANT PA_DIG5, 03              ; (o) digit 3 port address
-                  CONSTANT PA_DIG4, 04              ; (o) digit 2 port address
-                  CONSTANT PA_DIG3, 05              ; (o) digit 1 port address
-                  CONSTANT PA_DIG2, 06              ; (o) digit 0 port address
-                  CONSTANT PA_DIG1, 07              ; (o) decimal points 3:0 port address
-                  CONSTANT PA_DIG0, 08              ; (o) decimal points 3:0 port address
-                  ;------RGB---
-                  CONSTANT PA_FFT_RED, 0A           ; (O) RBG_RED
-                  CONSTANT PA_FFT_GREEN, 0B         ; (O) RGB_GREEN
-                  CONSTANT PA_FFT_BLUE, 0C          ; (O) RGB_BLUE
-                  ;------Delay-----
-                  CONSTANT DELAYVAL_1uS, 18         ; 1us delay count
-                  ; ==================================
-                  ; === Masking and other constant ===
-                  ; ==================================
-                  CONSTANT MSK_ALLBTNS, 1F          ; Buttons are in bits[5:0]
-                  CONSTANT BtnCenter, 10            ;
-                  CONSTANT BtnLeft, 08              ;
-                  CONSTANT BtnUp, 04                ;
-                  CONSTANT BtnRight, 02             ;
-                  CONSTANT BtnDown, 01              ;
-                  CONSTANT BtnNo, 00                ;
-                  ;----- RGB DEFINING
-                  CONSTANT RED_REG_DS, 25           ; sevensegment value for displying R
-                  CONSTANT GREEN_REG_DS, 09         ; sevensegment value for displying g
-                  CONSTANT BLUE_REG_DS, 11          ; sevensegment value for displying B
-                  ;----- RGB DEFAULT VALUE
-                  CONSTANT Red_Default, 00          ; red value
-                  CONSTANT Green_Default, 0F        ; green value
-                  CONSTANT Blue_Default, 00         ; blur value
-                  ;----- Define a few BCD constants
-                  CONSTANT ONEHUNDRED, 64           ; 100 is 64 Hex
-                  CONSTANT TEN, 0A                  ; 10 is 0A hex
-                  ; =====================
-                  ; === Program Start ===
-                  ; =====================
-                  ADDRESS 000
-                  JUMP main                         ; workaround to avoid location 3 corruption
-                  JUMP main                         ; by Vivado Hardware Manager.  Bug was flagged by
-                  JUMP main                         ; Ken Chapman and is known to be in 2014.2
-                  JUMP main                         ; Address 003 can be corrupted by Vivado HW manager
-                  ;
-            main: CALL init_colors                  ; initialize Color reg with default value
-                  CALL DEB_rdbtns                   ; initialize button
-                  ; ==================
-                  ; === Main  Loop ===
-                  ; ==================
-         main_L0: CALL compare_pb
-                  CALL BIN2BCD                      ; convert binary value in BCD
-                  CALL Seven_segment                ;
-                  CALL output_RGB                   ;
-                  CALL delay_500ms                  ;
-                  JUMP main_L0                      ;
-                  ; ========================================================================
-                  ; ===      Initialize colors for the FFT        ===
-                  ; ========================================================================
-     init_colors: LOAD color_reg, GREEN_REG_DS      ;
-                  LOAD Fft_Red_reg, Red_Default     ;
-                  LOAD Fft_Green_reg, Green_Default ;
-                  LOAD Fft_Blue_reg, Blue_Default   ;
-                  LOAD dv_reg, Fft_Green_reg        ;
-                  RETURN                            ;
-                  ; ========================================================================
-                  ; ===      Read in pushbutton inputs        ===
-                  ; ========================================================================
-      DEB_rdbtns: INPUT pbtns_reg, PA_PBTNS         ; read the buttons
-                  AND pbtns_reg, MSK_ALLBTNS        ; mask out unused bits
-                  RETURN                            ; and return
-                  ; ========================================================================
-                  ; === Compare pushbuttons and take action up/down color and value ===
-                  ; ========================================================================
-      compare_pb: CALL DEB_rdbtns                   ;
-                  COMPARE pbtns_reg, BtnNo          ;
-                  RETURN Z                          ;
-                  COMPARE pbtns_reg, BtnDown        ;
-                  CALL Z, down_color                ;
-                  COMPARE pbtns_reg, BtnUp          ;
-                  CALL Z, up_color                  ;
-                  COMPARE pbtns_reg, BtnDown        ;
-                  CALL Z, value_down                ;
-                  COMPARE pbtns_reg, BtnDown        ;
-                  CALL Z, value_up                  ;
-                  COMPARE pbtns_reg, BtnCenter      ;
-                  RETURN Z                          ;
-                  RETURN                            ;
-                  ; ================================================================================================
-                  ; === action down color, check current status of color and then down (r to g, g to b, b to r) ====
-                  ; ================================================================================================
-      down_color: COMPARE color_reg, RED_REG_DS     ;
-                  CALL Z, select_green              ;
-                  COMPARE color_reg, GREEN_REG_DS   ;
-                  CALL Z, select_blue               ;
-                  COMPARE color_reg, BLUE_REG_DS    ;
-                  CALL Z, select_red                ;
-                  RETURN                            ;
-                  ; ========================================================================================
-                  ; === action up color, check current status of color and then up (r to b, g to r, b to r)
-                  ; ========================================================================================
-        up_color: COMPARE color_reg, RED_REG_DS     ;
-                  CALL Z, select_blue               ;
-                  COMPARE color_reg, GREEN_REG_DS   ;
-                  CALL Z, select_red                ;
-                  COMPARE color_reg, BLUE_REG_DS    ;
-                  CALL Z, select_red                ;
-                  RETURN                            ;
-                  ; ========================================================================
-                  ; === load selected or next color action
-                  ; ========================================================================
-    select_green: LOAD color_reg, GREEN_REG_DS      ;
-                  RETURN                            ;
-     select_blue: LOAD color_reg, BLUE_REG_DS       ;
-                  RETURN                            ;
-      select_red: LOAD color_reg, RED_REG_DS        ;
-                  RETURN                            ;
-                  ; =================================================================================================
-                  ; === action down value of color, check current status of color(r,g,b) and then down r/g/b reg
-                  ; =================================================================================================
-      value_down: COMPARE color_reg, RED_REG_DS     ;
-                  CALL Z, red_reg_down              ;
-                  COMPARE color_reg, GREEN_REG_DS   ;
-                  CALL Z, green_reg_down            ;
-                  COMPARE color_reg, BLUE_REG_DS    ;
-                  CALL Z, blue_reg_down             ;
-                  RETURN                            ;
-                  ; ===================================================================================================================
-                  ; === check current value of color(min), if minimum then load r/g/b reg with 0f(1111) else decrement by 1 r/g/b reg
-                  ;        and update current value of reg (dv_reg)
-                  ;; ==================================================================================================================
-                  ;
-                  ;             RED
-                  ; ===========================================================================================
-    red_reg_down: COMPARE Fft_Red_reg, 00           ;
-                  JUMP Z, red_decrement             ;
-                  SUB Fft_Red_reg, 01               ;
-                  LOAD dv_reg, Fft_Red_reg          ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === load r/g/b reg with 0f(1111) and update current value of reg (dv_reg)
-                  ; ===========================================================================================
-   red_decrement: LOAD Fft_Red_reg, 0F              ;
-                  LOAD dv_reg, Fft_Red_reg          ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ;           Green
-                  ; ===========================================================================================
-  green_reg_down: COMPARE Fft_Green_reg, 00         ;
-                  JUMP Z, green_decrement           ;
-                  SUB Fft_Green_reg, 01             ;
-                  LOAD dv_reg, Fft_Green_reg        ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === load r/g/b reg with 0f(1111) and update current value of reg (dv_reg)
-                  ; ===========================================================================================
- green_decrement: LOAD Fft_Green_reg, 0F            ;
-                  LOAD dv_reg, Fft_Green_reg        ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ;             Blue
-                  ; ===========================================================================================
-   blue_reg_down: COMPARE Fft_Blue_reg, 00          ;
-                  JUMP Z, blue_decrement            ;
-                  SUB Fft_Blue_reg, 01              ;
-                  LOAD dv_reg, Fft_Blue_reg         ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === load r/g/b reg with 0f(1111) and update current value of reg (dv_reg)
-                  ; ===========================================================================================
-  blue_decrement: LOAD Fft_Blue_reg, 0F             ;
-                  LOAD dv_reg, Fft_Blue_reg         ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === action up value of color, check current status of color(r,g,b) and up down r/g/b reg
-                  ; ===========================================================================================
-        value_up: COMPARE color_reg, RED_REG_DS     ;
-                  CALL Z, red_reg_up                ;
-                  COMPARE color_reg, GREEN_REG_DS   ;
-                  CALL Z, green_reg_up              ;
-                  COMPARE color_reg, BLUE_REG_DS    ;
-                  CALL Z, blue_reg_up               ;
-                  RETURN                            ;
-                  ; ==================================================================================================================
-                  ; === check current value of color(min), if maximum then load r/g/b reg with 00(0000) else increment by 1 r/g/b reg
-                  ;        and update current value of reg (dv_reg)
-                  ;; =================================================================================================================
-                  ;
-                  ;             RED
-                  ; ============================================================================================
-      red_reg_up: COMPARE Fft_Red_reg, 0F           ;
-                  JUMP Z, red_increament            ;
-                  ADD Fft_Red_reg, 01               ;
-                  LOAD dv_reg, Fft_Red_reg          ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === load r/g/b reg with 00(0000) and update current value of reg (dv_reg)
-                  ; ===========================================================================================
-  red_increament: LOAD Fft_Red_reg, 00              ;
-                  LOAD dv_reg, Fft_Red_reg          ;
-                  RETURN 
-                  ; ===========================================================================================
-                  ;             Green
-                  ; ===========================================================================================
-    green_reg_up: COMPARE Fft_Green_reg, 0F         ;
-                  JUMP Z, green_increament          ;
-                  ADD Fft_Green_reg, 01             ;
-                  LOAD dv_reg, Fft_Green_reg        ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ; === load r/g/b reg with 00(0000) and update current value of reg (dv_reg)
-                  ; ===========================================================================================
-green_increament: LOAD Fft_Green_reg, 00            ;
-                  LOAD dv_reg, Fft_Green_reg        ;
-                  RETURN 
-                  ; ===========================================================================================
-                  ;             Blue
-                  ; ===========================================================================================
-     blue_reg_up: COMPARE Fft_Blue_reg, 0F          ;
-                  JUMP Z, blue_increment            ;
-                  ADD Fft_Blue_reg, 01              ;
-                  LOAD dv_reg, Fft_Blue_reg         ;
-                  RETURN                            ;
-  blue_increment: LOAD Fft_Blue_reg, 00             ;
-                  LOAD dv_reg, Fft_Blue_reg         ;
-                  RETURN                            ;
-                  ; ===========================================================================================
-                  ;         Binary to BCD conversion
-                  ; ===========================================================================================
-         BIN2BCD: LOAD DIG1S, dv_reg                ; load binary value for BCD conversion
-                  LOAD DIG100S, 00                  ; clear the digits
-                  LOAD DIG10S, 00                   ;
-                  ;
-          LP100S: ;
-                  COMPARE DIG1S, ONEHUNDRED         ; while (input >= 100) {
-                  JUMP C, LP10S                     ; // C=1 says input < 100
-                  ; // check 10s next
-                  ADD DIG100S, 01                   ; hundreds_digit =
-                  ; hundreds_digit + 1
-                  SUB DIG1S, ONEHUNDRED             ; input = input - 100
-                  JUMP LP100S                       ; }
-                  ;
-           LP10S: ;
-                  COMPARE DIG1S, TEN                ; while (input >= 10) {
-                  RETURN C                          ; // C=1 says input < 10, ones
-                  ; // are left in DIG1S (s0) so
-                  ; // return
-                  ADD DIG10S, 01                    ; tens_digit = tens_digit + 1
-                  SUB DIG1S, TEN                    ; input = input - 10
-                  JUMP LP10S                        ; }
-                  ;
-                  RETURN                            ; all done
-                  ; ===========================================================================================
-                  ;          Seven_segment
-                  ; ===========================================================================================
-   Seven_segment: 
-                  OUTPUT DIG1S, PA_DIG0             ;
-                  OUTPUT DIG10S, PA_DIG1            ;
-                  OUTPUT color_reg, PA_DIG4         ;
-                  RETURN                            ;
-                  ; ========================================================================
-                  ; ===       Outputting RGB to ImgCtrl        ===
-                  ; ========================================================================
-      output_RGB: LOAD s0, Fft_Blue_reg             ;
-                  OUTPUT s0, PA_FFT_BLUE            ;
-                  LOAD s0, Fft_Red_reg              ;
-                  OUTPUT s0, PA_FFT_RED             ;
-                  LOAD s0, Fft_Green_reg            ;
-                  OUTPUT s0, PA_FFT_GREEN           ;
-                  RETURN 
-                  ; =========================
-                  ; === Interrupt Handler ===
-                  ; =========================
-                  ADDRESS 300
-             isr: RETURNI ENABLE                    ; and return from interrupt
-                  ; ========================
-                  ; === Interrupt vector ===
-                  ; ========================
-                  ADDRESS 3FF
-         intvect: JUMP isr                          ; jump to interrupt service routine
-                  ; ========================================================
-                  ; === delay_1us() - delays execution for 1 microsecond ===
-                  ; === Registers affected: s0 ===
-                  ; ========================================================
-       delay_1us: LOAD s0, DELAYVAL_1uS             ; Load 1us delay constant
-        wait_1us: SUB s0, 01                        ; count down to 0
-                  JUMP NZ, wait_1us                 ; and then return
-                  RETURN 
-                  ; ===========================================================
-                  ; === delay_40us() - delays execution for 40 microseconds ===
-                  ; === Registers affected: s0, s1 ===
-                  ; ===========================================================
-      delay_40us: LOAD s1, 28                       ; 40 x 1us = 40us
-       wait_40us: CALL delay_1us                    ; delay 1us
-                  SUB s1, 01                        ; count down to 0
-                  JUMP NZ, wait_40us                ; and then return
-                  RETURN 
-                  ; ========================================================
-                  ; === delay_1 ms() - delays execution for 1 milisecond ===
-                  ; === Registers affected: s0, s1, s2 ===
-                  ; ========================================================
-       delay_1ms: LOAD s2, 19                       ; 25 x 40us = 1ms
-        wait_1ms: CALL delay_40us                   ; delay 40us
-                  SUB s2, 01                        ; count down to 0
-                  JUMP NZ, wait_1ms                 ; and then return
-                  RETURN 
-                  ; ===================================================================
-                  ; === delay_50 ms() - delays execution for 50 miliseconds (20Hz)===
-                  ; === Registers affected: s0, s1, s2, s3 ===
-                  ; ===================================================================
-      delay_50ms: LOAD s3, 32                       ; 50 x 1ms = 50ms
-       wait_50ms: CALL delay_1ms                    ; delay 1ms
-                  SUB s3, 01                        ; count down to 0
-                  JUMP NZ, wait_50ms                ; and then return
-                  RETURN 
-                  ;*********************************************************************
-                  ; ===================================================================
-                  ; === delay_100 ms() - delays execution for 100 miliseconds (10Hz)===
-                  ; === Registers affected: s0, s1, s2, s3 ===
-                  ; ===================================================================
-     delay_100ms: LOAD s3, 64                       ; 100 x 1ms = 100ms
-      wait_100ms: CALL delay_1ms                    ; delay 1ms
-                  SUB s3, 01                        ; count down to 0
-                  JUMP NZ, wait_100ms               ; and then return
-                  RETURN 
-                  ;*********************************************************************
-                  ; ==================================================================
-                  ; === delay_200 ms() - delays execution for 200 miliseconds (5Hz)===
-                  ; === Registers affected: s0, s1, s2, s3 ===
-                  ; ==================================================================
-     delay_200ms: LOAD s3, C8                       ; 200 x 1ms = 200ms
-      wait_200ms: CALL delay_1ms                    ; delay 1ms
-                  SUB s3, 01                        ; count down to 0
-                  JUMP NZ, wait_200ms               ; and then return
-                  RETURN 
-                  ;*********************************************************************
-                  ; ==================================================================
-                  ; === delay_500 ms() - delays execution for 500 miliseconds (2Hz)===
-                  ; === Registers affected: s0, s1, s2, s3 ===
-                  ; ==================================================================
-     delay_500ms: LOAD s4, 05                       ; 5 x 100ms = 200ms
-      wait_500ms: CALL delay_100ms                  ; delay 100ms
-                  SUB s4, 01                        ; count down to 0
-                  JUMP NZ, wait_500ms               ; and then return
-                  RETURN 
-                  ;*********************************************************************
-                  ; ===============================================================
-                  ; === delay_1000 ms() - delays execution for 1000 miliseconds ===
-                  ; === Registers affected: s0, s1, s2, s3, s4 ===
-                  ; ===============================================================
-    delay_1000ms: LOAD s4, 05                       ; 5 x 200ms = 1000ms
-     wait_1000ms: CALL delay_200ms                  ; delay 200ms
-                  SUB s4, 01                        ; count down to 0
-                  JUMP NZ, wait_1000ms              ; and then return
-                  RETURN 
-                  ;*******************************************************************
+                ; ============================================
+                ; === Register Names                       ===
+                ; === s6 - s0 registers are not dedicated  ===
+                ; === and keep their default names         ===
+                ; ============================================
+                NAMEREG sC, RegBtns                ; Pushbutton inputs
+                NAMEREG sB, RegCurrColor           ; Current color (RED, GRN, BLUE) being displayed
+                NAMEREG sA, RegCurrValue           ; 8-bit value of current color being displayed
+                NAMEREG s9, RegHundreds            ; Hundreds digit for Bin2Dec routine
+                NAMEREG s8, RegTens                ; Tens digit for Bin2Dec routine
+                NAMEREG s7, RegOnes                ; Ones digit for Bin2Dec routine
+                ; ======================
+                ; === Port Addresses ===
+                ; ======================
+                ;------Pushbutton---
+                CONSTANT PA_PBTNS, 00              ; (i) pushbuttons inputs
+                ;------SEVENSEGMENT---
+                CONSTANT PA_DIG7, 01               ; (o) digit 7 port address
+                CONSTANT PA_DIG6, 02               ; (o) digit 6 port address
+                CONSTANT PA_DIG5, 03               ; (o) digit 5 port address
+                CONSTANT PA_DIG4, 04               ; (o) digit 4 port address
+                CONSTANT PA_DIG3, 05               ; (o) digit 3 port address
+                CONSTANT PA_DIG2, 06               ; (o) digit 2 port address
+                CONSTANT PA_DIG1, 07               ; (o) digit 1 port address
+                CONSTANT PA_DIG0, 08               ; (o) digit 0 port address
+                ;------RGB---
+                CONSTANT PA_FFT_RED, 0A            ; (o) 4-bit color value to use in FFT display
+                CONSTANT PA_FFT_GREEN, 0B          ; (o) 4-bit color value to use in FFT display
+                CONSTANT PA_FFT_BLUE, 0C           ; (o) 4-bit color value to use in FFT display
+                ;------Delay-----
+                CONSTANT DELAYVAL_1uS, 18          ; 1us delay count
+                ; ==================================
+                ; === Masking and other constant ===
+                ; ==================================
+                CONSTANT MSK_ALLBTNS, 1F           ; Keep db_pbtns [5:0]
+                CONSTANT MSK_BTN_CENTER, 10        ; Only keep db_pbtns[5]
+                CONSTANT MSK_BTN_LEFT, 08          ; Only keep db_pbtns[4]
+                CONSTANT MSK_BTN_UP, 04            ; Only keep db_pbtns[3]
+                CONSTANT MSK_BTN_RIGHT, 02         ; Only keep db_pbtns[2]
+                CONSTANT MSK_BTN_DOWN, 01          ; Only keep db_pbtns[1]
+                CONSTANT MSK_BTN_CPURESET, 00      ; Only keep db_pbtns[0]
+                CONSTANT MSK_LOW_4BITS, 0F         ; keep only [3:0] for R/G/B values
+                ;----- Color indicator for menu
+                CONSTANT SEGMENT_R, 0A             ; sevensegment value for displaying R
+                CONSTANT SEGMENT_G, 0B             ; sevensegment value for displaying G
+                CONSTANT SEGMENT_B, 0C             ; sevensegment value for displaying B
+                ;----- Default color values
+                CONSTANT DEFAULT_RED, 00           ; initial red value for FFT display
+                CONSTANT DEFAULT_GREEN, 0F         ; initial green value for FFT display
+                CONSTANT DEFAULT_BLUE, 00          ; initial blue value for FFT display
+                ;----- Define a few BCD constants
+                CONSTANT BIN_100, 64               ; binary 100 == hex 64
+                CONSTANT BIN_10, 0A                ; binary 10 == hex 0A
+                ;----- Define addresses for scratchpad memory
+                CONSTANT SP_CURR_STATE, 30         ; address to read encoding for the current state
+                CONSTANT SP_CURR_VALUE, 31         ; address to store value for current color
+                CONSTANT SP_RED_VALUE, 32          ; address to read 4'b red color value
+                CONSTANT SP_GREEN_VALUE, 33        ; address to read 4'b green color value
+                CONSTANT SP_BLUE_VALUE, 34         ; address to read 4'b blue color value
+                ; =====================
+                ; === Program Start ===
+                ; =====================
+                ADDRESS 000
+                JUMP main                          ; workaround to avoid location 3 corruption
+                JUMP main                          ; by Vivado Hardware Manager.  Bug was flagged by
+                JUMP main                          ; Ken Chapman and is known to be in 2014.2
+                JUMP main                          ; Address 003 can be corrupted by Vivado HW manager
+                ;
+          main: CALL init_colors                   ; initialize red, green, blue values for FFT display
+                ; ==================
+                ; === Main  Loop ===
+                ; ==================
+       main_L0: CALL state_machine                 ; call sub-routine to update state or R/G/B value
+                CALL bin2bcd                       ; converts RegCurrValue's binary data to decimal encoding
+                CALL write_7segment                ; write RegOnes, RegTens, RegCurrentColor to 7-segment display
+                CALL output_RGB                    ; outputs R, G, B values to FFT registers
+                CALL delay_100ms                   ; delay for 100ms, as there's no need to run at 100MHz
+                JUMP main_L0                       ; rinse, dry, repeat
+                ; ========================================================================
+                ; ===   init_colors: Initialize RGB values for the FFT       ===
+                ; ========================================================================
+   init_colors: LOAD RegCurrColor, SEGMENT_R       ; load the current color as 'red'
+                STORE RegCurrColor, SP_CURR_STATE  ; store 'red' as current state for FSM
+                LOAD s0, DEFAULT_RED               ; initialize red value as 4'b0000
+                STORE s0, SP_RED_VALUE             ; store this red value into scratchpad
+                LOAD RegCurrValue, s0              ; load the current value as 4'b0000
+                LOAD s0, DEFAULT_GREEN             ; initialize green value as 4'b1111
+                STORE s0, SP_GREEN_VALUE           ; store this green value into scratchpad
+                LOAD s0, DEFAULT_BLUE              ; initialize blue value as 4'b0000
+                STORE s0, SP_BLUE_VALUE            ; store this blue value into scratchpad
+                RETURN                             ; return to main_L0
+                ; ================================================================================================================
+                ; ===    state_machine: updates state or R/G/B value based on current state & button inputs       ===
+                ; ================================================================================================================
+ state_machine: COMPARE RegCurrColor, SEGMENT_R    ; check if the current state is 'red'
+                JUMP Z, state_red                  ; if so, jump to routine for handling that state
+                COMPARE RegCurrColor, SEGMENT_G    ; check if the current state is 'green'
+                JUMP Z, state_green                ; if so, jump to routine for handling that state
+                COMPARE RegCurrColor, SEGMENT_B    ; check if the current state is 'blue'
+                JUMP Z, state_blue                 ; if so, jump to routine for handling that state
+                RETURN                             ; return to main_L0 (code shouldn't reach this point, though)
+     state_red: STORE RegCurrValue, SP_RED_VALUE   ; keep 'red' value in scratchpad up-to-date
+                LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
+                COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
+                JUMP Z, go_to_blue                 ; if so, change the current state to 'blue'
+                COMPARE s0, MSK_BTN_RIGHT          ; see if only btnR is pressed
+                JUMP Z, go_to_green                ; if so, change the current state to 'green'
+                COMPARE s0, MSK_BTN_UP             ; see if only btnU is pressed
+                JUMP Z, inc_cur_val                ; if so, increment the value of current color (red)
+                COMPARE s0, MSK_BTN_DOWN           ; see if only btnD is pressed
+                JUMP Z, dec_cur_val                ; if so, decrement the value of current color (red)
+                RETURN                             ; return to main_L0 if button inputs don't match
+   state_green: STORE RegCurrValue, SP_GREEN_VALUE ; keep 'green' value in scratchpad up-to-date
+                LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
+                COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
+                JUMP Z, go_to_red                  ; if so, change the current state to 'red'
+                COMPARE s0, MSK_BTN_RIGHT          ; see if only btnR is pressed
+                JUMP Z, go_to_blue                 ; if so, change the current state to 'blue'
+                COMPARE s0, MSK_BTN_UP             ; see if only btnU is pressed
+                JUMP Z, inc_cur_val                ; if so, increment the value of current color (green)
+                COMPARE s0, MSK_BTN_DOWN           ; see if only btnD is pressed
+                JUMP Z, dec_cur_val                ; if so, decrement the value of current color (green)
+                RETURN                             ; return to main_L0 if button inputs don't match
+    state_blue: STORE RegCurrValue, SP_BLUE_VALUE  ; keep 'blue' value in scratchpad up-to-date
+                LOAD s0, RegBtns                   ; load db_pbtns[5:0] into s0
+                COMPARE s0, MSK_BTN_LEFT           ; see if only btnL is pressed
+                JUMP Z, go_to_green                ; if so, change the current state to 'green'
+                COMPARE s0, MSK_BTN_RIGHT          ; see if only btnR is pressed
+                JUMP Z, go_to_red                  ; if so, change the current state to 'red'
+                COMPARE s0, MSK_BTN_UP             ; see if only btnU is pressed
+                JUMP Z, inc_cur_val                ; if so, increment the value of current color (blue)
+                COMPARE s0, MSK_BTN_DOWN           ; see if only btnD is pressed
+                JUMP Z, dec_cur_val                ; if so, decrement the value of current color (blue)
+                RETURN                             ; return to main_L0 if button inputs don't match
+     go_to_red: LOAD RegCurrColor, SEGMENT_R       ; set the state as 'red'
+                STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
+                FETCH RegCurrValue, SP_RED_VALUE   ; fetch the stored 'red' value into current value reg
+                STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
+                RETURN                             ; return to main_L0
+   go_to_green: LOAD RegCurrColor, SEGMENT_G       ; set the state as 'green'
+                STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
+                FETCH RegCurrValue, SP_GREEN_VALUE ; fetch the stored 'green' value into current value reg
+                STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
+                RETURN                             ; return to main_L0
+    go_to_blue: LOAD RegCurrColor, SEGMENT_B       ; set the state as 'blue'
+                STORE RegCurrColor, SP_CURR_STATE  ; update the state stored in scratchpad
+                FETCH RegCurrValue, SP_BLUE_VALUE  ; fetch the stored 'blue' value into current value reg
+                STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
+                RETURN                             ; return to main_L0
+   inc_cur_val: ADD RegCurrValue, 01               ; increment the current value by 1
+                STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
+                RETURN 
+   dec_cur_val: SUB RegCurrValue, 01               ; decrement the current value by 1
+                STORE RegCurrValue, SP_CURR_VALUE  ; store this value into scratchpad
+                RETURN 
+                ; ===========================================================================================
+                ;        bin2bcd: Binary to Decimal conversion
+                ; ===========================================================================================
+       bin2bcd: FETCH s0, SP_CURR_VALUE            ; fetch current value into s0
+                LOAD RegOnes, s0                   ; load binary value for BCD conversion
+                LOAD RegHundreds, 00               ; clear the digits
+                LOAD RegTens, 00                   ;
+                ;
+     loop_100s: COMPARE RegOnes, BIN_100           ; while (input >= 100) {
+                JUMP C, loop_10s                   ; // C == 1 means input < 100
+                ; // check 10s next
+                ADD RegHundreds, 01                ; hundreds_digit =
+                ; hundreds_digit + 1
+                SUB RegOnes, BIN_100               ; input = input - 100
+                JUMP loop_100s                     ; }
+                ;
+      loop_10s: COMPARE RegOnes, BIN_10            ; while (input >= 10) {
+                RETURN C                           ; // C=1 says input < 10, ones
+                ; // are left in RegOnes (s0) so
+                ; // return
+                ADD RegTens, 01                    ; tens_digit = tens_digit + 1
+                SUB RegOnes, BIN_10                ; input = input - 10
+                JUMP loop_10s                      ; }
+                ;
+                RETURN                             ; return to main_L0
+                ; ===========================================================================================
+                ;     write_7segment: writes Digits 0, 1, 4 to 7-segment display
+                ; ===========================================================================================
+write_7segment: OUTPUT RegOnes, PA_DIG0            ; write BCD ones value --> digit 0
+                OUTPUT RegTens, PA_DIG1            ; write BCD tens value --> digit 1
+                FETCH s0, SP_CURR_STATE            ; fetch the current color into reg
+                OUTPUT s0, PA_DIG4                 ; write R/G/B color code --> digit 4
+                RETURN                             ; return to main_L0
+                ; ========================================================================
+                ; ===    output_RGB: Outputting RGB to ImgCtrl        ===
+                ; ========================================================================
+    output_RGB: FETCH s0, SP_RED_VALUE             ; fetch the current red value into s0
+                AND s0, MSK_LOW_4BITS              ; only keep bits [3:0] for VGA red output
+                OUTPUT s0, PA_FFT_RED              ; write the red value to the FFT
+                FETCH s0, SP_GREEN_VALUE           ; fetch the current green value into s0
+                AND s0, MSK_LOW_4BITS              ; only keep bits [3:0] for VGA green output
+                OUTPUT s0, PA_FFT_GREEN            ; write the green value to the FFT
+                FETCH s0, SP_BLUE_VALUE            ; fetch the stored blue value into s0
+                AND s0, MSK_LOW_4BITS              ; only keep bits [3:0] for VGA blue output
+                OUTPUT s0, PA_FFT_BLUE             ; write the blue value to the FFT
+                RETURN                             ; return to main_L0
+                ; =========================
+                ; === Interrupt Handler ===
+                ; =========================
+                ADDRESS 300
+           isr: INPUT RegBtns, PA_PBTNS            ; read the pushbuttons
+                AND RegBtns, MSK_ALLBTNS           ; mask all but db_pbtns[5:0]
+                RETURNI ENABLE                     ; and return from interrupt
+                ; ========================
+                ; === Interrupt vector ===
+                ; ========================
+                ADDRESS 3FF
+       intvect: JUMP isr                           ; jump to interrupt service routine
+                ; ========================================================
+                ; === delay_1us() - delays execution for 1 microsecond ===
+                ; === Registers affected: s0 ===
+                ; ========================================================
+     delay_1us: LOAD s0, DELAYVAL_1uS              ; Load 1us delay constant
+      wait_1us: SUB s0, 01                         ; count down to 0
+                JUMP NZ, wait_1us                  ; and then return
+                RETURN 
+                ; ===========================================================
+                ; === delay_40us() - delays execution for 40 microseconds ===
+                ; === Registers affected: s0, s1 ===
+                ; ===========================================================
+    delay_40us: LOAD s1, 28                        ; 40 x 1us = 40us
+     wait_40us: CALL delay_1us                     ; delay 1us
+                SUB s1, 01                         ; count down to 0
+                JUMP NZ, wait_40us                 ; and then return
+                RETURN 
+                ; ========================================================
+                ; === delay_1 ms() - delays execution for 1 milisecond ===
+                ; === Registers affected: s0, s1, s2 ===
+                ; ========================================================
+     delay_1ms: LOAD s2, 19                        ; 25 x 40us = 1ms
+      wait_1ms: CALL delay_40us                    ; delay 40us
+                SUB s2, 01                         ; count down to 0
+                JUMP NZ, wait_1ms                  ; and then return
+                RETURN 
+                ; ===================================================================
+                ; === delay_50 ms() - delays execution for 50 miliseconds (20Hz)===
+                ; === Registers affected: s0, s1, s2, s3 ===
+                ; ===================================================================
+    delay_50ms: LOAD s3, 32                        ; 50 x 1ms = 50ms
+     wait_50ms: CALL delay_1ms                     ; delay 1ms
+                SUB s3, 01                         ; count down to 0
+                JUMP NZ, wait_50ms                 ; and then return
+                RETURN 
+                ;*********************************************************************
+                ; ===================================================================
+                ; === delay_100 ms() - delays execution for 100 miliseconds (10Hz)===
+                ; === Registers affected: s0, s1, s2, s3 ===
+                ; ===================================================================
+   delay_100ms: LOAD s3, 64                        ; 100 x 1ms = 100ms
+    wait_100ms: CALL delay_1ms                     ; delay 1ms
+                SUB s3, 01                         ; count down to 0
+                JUMP NZ, wait_100ms                ; and then return
+                RETURN 
+                ;*********************************************************************
+                ; ==================================================================
+                ; === delay_200 ms() - delays execution for 200 miliseconds (5Hz)===
+                ; === Registers affected: s0, s1, s2, s3 ===
+                ; ==================================================================
+   delay_200ms: LOAD s3, C8                        ; 200 x 1ms = 200ms
+    wait_200ms: CALL delay_1ms                     ; delay 1ms
+                SUB s3, 01                         ; count down to 0
+                JUMP NZ, wait_200ms                ; and then return
+                RETURN 
+                ;*********************************************************************
+                ; ==================================================================
+                ; === delay_500 ms() - delays execution for 500 miliseconds (2Hz)===
+                ; === Registers affected: s0, s1, s2, s3 ===
+                ; ==================================================================
+   delay_500ms: LOAD s4, 05                        ; 5 x 100ms = 200ms
+    wait_500ms: CALL delay_100ms                   ; delay 100ms
+                SUB s4, 01                         ; count down to 0
+                JUMP NZ, wait_500ms                ; and then return
+                RETURN 
+                ;*********************************************************************
+                ; ===============================================================
+                ; === delay_1000 ms() - delays execution for 1000 miliseconds ===
+                ; === Registers affected: s0, s1, s2, s3, s4 ===
+                ; ===============================================================
+  delay_1000ms: LOAD s4, 05                        ; 5 x 200ms = 1000ms
+   wait_1000ms: CALL delay_200ms                   ; delay 200ms
+                SUB s4, 01                         ; count down to 0
+                JUMP NZ, wait_1000ms               ; and then return
+                RETURN 
+                ;*******************************************************************

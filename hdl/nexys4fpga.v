@@ -7,12 +7,12 @@
 //
 //  Use the pushbuttons to control the FFT color:
 //
-//	btnl			(function)
-//	btnu			(function)
-//	btnr			(function)
-//	btnd			(function)
-//  btnc			Not used in this design
-//	btnCpuReset		CPU RESET Button - system reset.  Asserted low by Nexys 4 board
+//	btnL			Scroll through color menu
+//	btnR			Scroll through color menu
+//	btnU			Increase R/G/B value
+//	btnD			Decrease R/G/B value
+//  btnC			Resets the FFT core
+//	btnCpuReset		CPU RESET Button: active-low on board --> sets 'sysreset' high
 //
 //  External port names match pin names in the nexys4fpga.xdc constraints file
 //
@@ -28,10 +28,10 @@ module nexys4fpga (
 
 	// Pushbuttons & switches
 
-	input				btnL, btnR,				// pushbutton inputs - left (db_btns[4])and right (db_btns[2])
-	input				btnU, btnD,				// pushbutton inputs - up (db_btns[3]) and down (db_btns[1])
-	input				btnC,					// pushbutton inputs - center button -> db_btns[5]
-	input				btnCpuReset,			// red pushbutton input -> db_btns[0]
+	input				btnL, btnR,				// pushbutton inputs - left and right
+	input				btnU, btnD,				// pushbutton inputs - up and down
+	input				btnC,					// pushbutton inputs - center button
+	input				btnCpuReset,			// red pushbutton input
 	input 	[15:0]		sw,						// switch inputs
 	
 	// LEDs & 7-segment display
@@ -90,8 +90,13 @@ module nexys4fpga (
 	// Connections between debounce <--> Picoblaze
 
 	wire 	[15:0]		db_sw;						// debounced switches
-	wire 	[5:0]		db_btns;					// debounced buttons
-	
+	wire 				btnC_db;					// debounced center pushbutton
+	wire 				btnL_db;					// debounced left pushbutton
+	wire 				btnU_db;					// debounced up pushbutton
+	wire 				btnR_db;					// debounced right pushbutton
+	wire 				btnD_db;					// debounced down pushbutton
+	wire 				btnCpuReset_db;				// debounced CpuReset
+
 	// Connections between sevensegment <--> Picoblaze
 
 	wire 	[4:0]		dig7, dig6, dig5, dig4, 	// display digits [7:4]
@@ -135,11 +140,15 @@ module nexys4fpga (
 	reg 				flgStartAcquisition;		// 10Hz flag to restart FFT state machine
 	integer 			cntPresc;					// counter from 0 - 2,499,999
 
+	// Internal register for LED debugging
+
+	reg 	[15:0] 		led_reg;
+
 	/******************************************************************/
 	/* Global Assignments							                  */
 	/******************************************************************/			
 	
-	assign 	sysreset = ~db_btns[0]; 			// btnCpuReset is asserted low --> sysreset is active-high
+	assign 	sysreset = ~btnCpuReset_db; 		// btnCpuReset is asserted low --> sysreset is active-high
 
 	assign 	dp  = segs_int [7];					// sending decimal signals --> FPGA pins
 	assign 	seg = segs_int [6:0];				// sending digit signals --> FPGA pins
@@ -147,6 +156,9 @@ module nexys4fpga (
 	assign 	vga_red = {OutputRGB[11:8]};		// send 4-bits for red value in current pixel
 	assign 	vga_green = {OutputRGB[7:4]};		// send 4-bits for green value in current pixel
 	assign 	vga_blue = {OutputRGB[3:0]};		// send 4-bits for blue value in current pixel
+
+	assign led[7:0] = led_reg[7:0];
+	assign led[15:8] = led_reg[15:8];
 
 	/******************************************************************/
 	/* flgStartAcquisition generator block 			                  */
@@ -168,6 +180,15 @@ module nexys4fpga (
 		end
 	end
 
+	// show time-domain and frequency domain data on LEDs
+	// used for debugging
+
+	always@(posedge CLK_25MHZ) begin
+		if (flgStartAcquisition == 1) begin
+			led_reg[7:0]   <= byteFreqSample;
+			led_reg[15:8]  <= wordTimeSample[10:3];
+		end
+	end
 	/******************************************************************/
 	/* ClockWiz instantiation		           	                      */
 	/******************************************************************/
@@ -194,7 +215,7 @@ module nexys4fpga (
 
 		// connections with Picoblaze
 
-		.pbtn_db	(db_btns),
+		.pbtn_db	({btnC_db,btnL_db,btnU_db,btnR_db,btnD_db,btnCpuReset_db}),
 		.swtch_db	(db_sw),
 
 		// connections with Nexys4
@@ -202,7 +223,6 @@ module nexys4fpga (
 		.clk 		(CLK_100MHZ),	
 		.pbtn_in	({btnC,btnL,btnU,btnR,btnD,btnCpuReset}),
 		.switch_in	(sw));
-	
 	
 	/******************************************************************/
 	/* sevensegment instantiation					                  */
@@ -253,7 +273,7 @@ module nexys4fpga (
 	FftBlock FFT (
 
 		.flgStartAcquisition	(flgStartAcquisition),		// I [ 0 ] resets the FFT state machine every 10Hz
-		.btnL 					(db_btns[4]),				// I [ 0 ] pushbutton to reset FFT state machine
+		.btnC 					(btnC_db),					// I [ 0 ] pushbutton to reset FFT state machine
 		.sw 					(db_sw[2:0]),				// I [2:0] selecting output data byte (sensitivity)
 		.ckaTime 				(CLK_100MHZ),				// I [ 0 ] 100MHz system clock from ClockWiz
 		.ckFreq 				(CLK_25MHZ),				// I [ 0 ] 25MHz clock from ClockWiz
@@ -344,7 +364,7 @@ module nexys4fpga (
 
 		// connections with debounce
 
-		.db_btns 			(db_btns),				// I [5:0] debounced pushbutton inputs
+		.db_btns 			({btnC_db,btnL_db,btnU_db,btnR_db,btnD_db,btnCpuReset_db}),		// I [5:0] debounced pushbuttons
 
 		// connections with sevensegment
 

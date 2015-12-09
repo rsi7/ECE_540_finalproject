@@ -22,7 +22,7 @@ module FftBlock (
   /******************************************************************/
 
   input               flgStartAcquisition,          // resets the FFT state machine every 10Hz
-  input               btnL,                         // pushbutton to reset FFT state machine
+  input               btnC,                         // pushbutton to reset FFT state machine
   input       [2:0]   sw,                           // selecting output data byte (sensitivity)
   input               ckaTime,                      // 100MHz system clock from ClockWiz
   input               ckFreq,                       // 25MHz clock from ClockWiz
@@ -136,7 +136,7 @@ module FftBlock (
   // first block: apply reset if needed; otherwise advance the state
 
   always@(posedge ckaTime) begin
-    if(btnL == 1) begin
+    if(btnC == 1) begin
       stAxiLoadCur <= stRes0;
     end
     else begin

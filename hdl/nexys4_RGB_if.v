@@ -82,6 +82,7 @@ module nexys_RGB_if #(
 	wire 	btnUp 		= db_btns[3];
 	wire 	btnRight 	= db_btns[2];
 	wire 	btnDown 	= db_btns[1];
+	wire 	btnCpuReset = db_btns[0];
 
 	reg 	[3:0]		PicoblazeRed;
 	reg 	[3:0]		PicoblazeGreen;
@@ -107,7 +108,7 @@ module nexys_RGB_if #(
 		else begin
 			
 			case (port_id)
-				PA_PBTNS: in_port <= {3'b000, btnCenter, btnLeft, btnUp, btnRight, btnDown};
+				PA_PBTNS: in_port <= {2'b0, btnCenter, btnLeft, btnUp, btnRight, btnDown, btnCpuReset};
 			endcase
 		end
 	end

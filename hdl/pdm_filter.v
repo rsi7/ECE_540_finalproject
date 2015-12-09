@@ -63,12 +63,12 @@ module pdm_filter (
 
 	// highpass filter signals
 
-	wire 	[15:0]			data_o_HP;
+	wire 	[15:0]		data_o_HP;
 
 	// synchronizer registers
 	
-	reg 					fs_o_temp;
-	reg 	[15:0]			data_o_temp;	
+	reg 				fs_o_temp;
+	reg 	[15:0]		data_o_temp;	
 				
 	//******************************************************************/
 	//* 3.072MHz Clock Generator							           */
